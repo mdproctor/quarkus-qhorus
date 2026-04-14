@@ -127,6 +127,13 @@ All tools exposed via `QhorusMcpTools` (`@ApplicationScoped`) at the `/mcp` Stre
 | `set_channel_writers` | `ChannelDetail` | Update write ACL; null = open to all |
 | `set_channel_admins` | `ChannelDetail` | Update management ACL; null = open to any caller |
 | `set_channel_rate_limits` | `ChannelDetail` | Update per-channel and per-instance rate limits (messages/min); null = unlimited |
+
+### Observers
+| Tool | Returns | Notes |
+|---|---|---|
+| `register_observer` | `ObserverRegistration` | In-memory subscription to EVENT messages on named channels; no `Instance` row created |
+| `deregister_observer` | `DeregisterObserverResult` | Remove observer subscription |
+| `read_observer_events` | `CheckResult` | Returns only EVENT messages from a subscribed channel; cursor-based pagination |
 | `list_channels` | `List<ChannelDetail>` | Message counts fetched in single GROUP BY query (no N+1) |
 | `find_channel` | `List<ChannelDetail>` | Case-insensitive LIKE on name OR description |
 
@@ -168,6 +175,8 @@ All tools exposed via `QhorusMcpTools` (`@ApplicationScoped`) at the `/mcp` Stre
 - `send_message` enforces `allowed_writers` ACL when set — rejects senders not matching any entry (bare instance ID, `capability:tag`, or `role:name`). EVENT messages bypass this check.
 - `pause_channel`, `resume_channel`, `force_release_channel`, `clear_channel` enforce `admin_instances` when set — reject callers not in the list. Null/empty list = open governance (any caller permitted).
 - `send_message` enforces rate limits via an in-memory 60-second sliding window (`RateLimiter` bean). Per-channel limit counts across all senders; per-instance limit is isolated per sender. EVENT messages bypass. Limits reset on restart.
+- `send_message` rejects registered observers — observer IDs are read-only and cannot write to any channel.
+- `register_observer` registrations are ephemeral (`ObserverRegistry` bean); `list_instances` never returns observer IDs.
 
 ---
 
@@ -185,7 +194,7 @@ All tools exposed via `QhorusMcpTools` (`@ApplicationScoped`) at the `/mcp` Stre
 | **8 — Embed in Claudony** | ⬜ Pending | Unified MCP endpoint |
 | **9 — A2A compat** | ✅ Done | `POST /a2a/message:send`, `GET /a2a/tasks/{id}`; guarded by `quarkus.qhorus.a2a.enabled`; 29 tests |
 | **10 — Human-in-the-loop controls** | ✅ Done | pause/resume, approval gate, cancel_wait, force_release, revoke_artefact, delete_message, clear_channel, deregister_instance, channel_digest, watchdog alerting (optional); 103 tests |
-| **11 — Access control and governance** | 🔄 In Progress | Write permissions ✅ (V5, `allowed_writers`, 23 tests); admin role ✅ (V6, `admin_instances`, 23 tests); rate limiting ✅ (V7, sliding-window `RateLimiter`, per-channel + per-instance, 21 tests); read-only observer mode ⬜ |
+| **11 — Access control and governance** | ✅ Done | Write permissions (V5, `allowed_writers`, 23 tests); admin role (V6, `admin_instances`, 23 tests); rate limiting (V7, `RateLimiter`, 21 tests); observer mode (`ObserverRegistry`, `register_observer`, `read_observer_events`, 15 tests) — 82 tests total |
 | **12 — Structured observability** | ⬜ Pending | Mandatory `event` payload schema; `list_events` query tool; channel timeline API; audit trail queryable by time range and agent |
 
 ---

@@ -46,6 +46,9 @@ public class QhorusMcpTools {
     @Inject
     RateLimiter rateLimiter;
 
+    @Inject
+    io.quarkiverse.qhorus.runtime.instance.ObserverRegistry observerRegistry;
+
     // ---------------------------------------------------------------------------
     // Return-type records — public so tests can reference them
     // ---------------------------------------------------------------------------
@@ -217,6 +220,17 @@ public class QhorusMcpTools {
             String lastFiredAt) {
     }
 
+    public record ObserverRegistration(
+            String observerId,
+            java.util.Set<String> channelNames) {
+    }
+
+    public record DeregisterObserverResult(
+            String observerId,
+            boolean deregistered,
+            String message) {
+    }
+
     public record DeleteWatchdogResult(
             String watchdogId,
             boolean deleted,
@@ -269,6 +283,65 @@ public class QhorusMcpTools {
                 ? instanceService.findByCapability(capability)
                 : instanceService.listAll();
         return buildInstanceInfoList(instances);
+    }
+
+    // ---------------------------------------------------------------------------
+    // Observer tools
+    // ---------------------------------------------------------------------------
+
+    @Tool(name = "register_observer", description = "Subscribe a read-only observer to event messages on one or more channels. "
+            + "Observers receive EVENT messages without joining the instance registry — "
+            + "they are invisible to agents and cannot send messages. "
+            + "Observer registrations are in-memory and reset on restart.")
+    public ObserverRegistration registerObserver(
+            @ToolArg(name = "observer_id", description = "Unique observer identifier (use a distinct namespace from instance IDs, e.g. 'dashboard', 'monitor-1')") String observerId,
+            @ToolArg(name = "channel_names", description = "List of channel names to subscribe to") List<String> channelNames) {
+        observerRegistry.register(observerId, channelNames);
+        return new ObserverRegistration(observerId, observerRegistry.getSubscriptions(observerId));
+    }
+
+    @Tool(name = "deregister_observer", description = "Remove an observer subscription. "
+            + "After deregistration the ID is no longer treated as an observer.")
+    public DeregisterObserverResult deregisterObserver(
+            @ToolArg(name = "observer_id", description = "Observer ID to remove") String observerId) {
+        boolean removed = observerRegistry.deregister(observerId);
+        return new DeregisterObserverResult(observerId, removed,
+                removed ? "Observer '" + observerId + "' deregistered."
+                        : "Observer '" + observerId + "' was not registered.");
+    }
+
+    @Tool(name = "read_observer_events", description = "Read EVENT messages from a subscribed channel as a registered observer. "
+            + "Only returns EVENT-type messages. Supports cursor-based pagination via after_id.")
+    @Transactional
+    public CheckResult readObserverEvents(
+            @ToolArg(name = "observer_id", description = "Registered observer ID") String observerId,
+            @ToolArg(name = "channel_name", description = "Channel name to read from (must be in observer's subscription list)") String channelName,
+            @ToolArg(name = "after_id", description = "Return messages with ID greater than this value (0 for all)", required = false) Long afterId,
+            @ToolArg(name = "limit", description = "Max messages to return", required = false) Integer limit) {
+        if (!observerRegistry.isObserver(observerId)) {
+            throw new IllegalArgumentException(
+                    "Observer '" + observerId + "' is not registered. Call register_observer first.");
+        }
+        if (!observerRegistry.isSubscribedTo(observerId, channelName)) {
+            throw new IllegalArgumentException(
+                    "Observer '" + observerId + "' is not subscribed to channel '" + channelName
+                            + "'. Re-register with the channel included.");
+        }
+        Channel ch = channelService.findByName(channelName)
+                .orElseThrow(() -> new IllegalArgumentException("Channel not found: " + channelName));
+
+        long cursor = afterId != null ? afterId : 0L;
+        int pageSize = (limit != null && limit > 0) ? limit : 50;
+
+        List<Message> events = Message.<Message> find(
+                "channelId = ?1 AND messageType = ?2 AND id > ?3 ORDER BY id ASC",
+                ch.id, MessageType.EVENT, cursor)
+                .page(0, pageSize)
+                .list();
+
+        Long lastId = events.isEmpty() ? cursor : events.get(events.size() - 1).id;
+        List<MessageSummary> summaries = events.stream().map(this::toMessageSummary).toList();
+        return new CheckResult(summaries, lastId, null);
     }
 
     // ---------------------------------------------------------------------------
@@ -501,6 +574,13 @@ public class QhorusMcpTools {
         if (ch.paused) {
             throw new IllegalStateException(
                     "Channel '" + channelName + "' is paused — send_message blocked. Use resume_channel to re-enable.");
+        }
+
+        // Observer check — registered observers are read-only and cannot send any messages
+        if (observerRegistry.isObserver(sender)) {
+            throw new IllegalStateException(
+                    "Observer '" + sender + "' is read-only and cannot send messages. "
+                            + "Use read_observer_events to receive EVENT messages.");
         }
 
         MessageType msgType = MessageType.valueOf(type.toUpperCase());
