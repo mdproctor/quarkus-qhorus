@@ -20,7 +20,7 @@
 | Agent discovery | None | `/.well-known/agent-card.json` (A2A compatible) |
 | Transport | stdio + legacy SSE + Streamable HTTP | Streamable HTTP (MCP spec 2025-06-18) only |
 | Runtime size | Node.js ~80 MB | GraalVM native image ~30 MB |
-| Database | SQLite / PostgreSQL (raw SQL) | Panache ORM — H2 (dev/test), PostgreSQL (production) |
+| Database | SQLite / PostgreSQL (raw SQL, schema is disposable) | Panache ORM + Flyway versioned migrations — schema survives upgrades |
 | Embeddable | No | Yes — consumed as a Maven dependency by Claudony |
 
 ---
@@ -73,6 +73,19 @@ The original's six message types all appear in agent context. Routing decisions,
 The original has no enforcement of handoff semantics. An agent can produce a `handoff` and then continue producing tool results in the same turn. If those results arrive after the handoff recipient has started work, the last writer wins silently — the same race condition that causes subtle bugs in AutoGen and Swarm pipelines.
 
 Qhorus enforces that `handoff` is terminal: any in-flight results for that turn are logged and discarded once a `handoff` is produced.
+
+### Versioned schema migrations instead of a disposable database
+
+cross-claude-mcp treats its database as ephemeral — if the schema changes, restart with a fresh SQLite file. This works because the state it holds is transient: agents connect, coordinate, and disconnect. Nothing in the database needs to survive a server restart or a schema change.
+
+Qhorus uses Flyway versioned migrations because its state carries meaning across restarts:
+
+- Channel history may matter after a service restart
+- `PendingReply` rows must survive a restart or `wait_for_reply` callers lose their correlation ID tracking
+- `ArtefactClaim` reference counts must survive — if they're lost, artefacts get GC'd while agents are still consuming them
+- Multiple instances may share one database, and they must agree on schema version
+
+The migration concern is the price of the persistence guarantee. cross-claude-mcp implicitly says "state is ephemeral, restart freely." Qhorus says "state is durable, upgrade without data loss."
 
 ### Agent Card
 
