@@ -69,6 +69,20 @@ public class InstanceService {
                 .list();
     }
 
+    /**
+     * Returns all capability tags registered for the given instance.
+     * Used by the read-side addressing filter to resolve capability and role dispatch.
+     * Returns an empty list for unregistered instances (safe default — no visibility).
+     */
+    public List<String> findCapabilityTagsForInstance(String instanceId) {
+        return findByInstanceId(instanceId)
+                .map(i -> Capability.<Capability> find("instanceId", i.id).list()
+                        .stream()
+                        .map(c -> c.tag)
+                        .toList())
+                .orElse(List.of());
+    }
+
     public List<Instance> listAll() {
         return Instance.listAll();
     }

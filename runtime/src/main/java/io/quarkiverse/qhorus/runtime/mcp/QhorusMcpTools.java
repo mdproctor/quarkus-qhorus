@@ -376,15 +376,16 @@ public class QhorusMcpTools {
      * Returns true if the message is visible to the given reader.
      *
      * <p>
-     * A message is visible when:
+     * A message is visible when any of these conditions hold:
      * <ul>
-     * <li>No {@code readerInstanceId} is provided (no filter — all messages visible), or</li>
-     * <li>The message has no target (broadcast), or</li>
-     * <li>The message target is {@code instance:<readerInstanceId>}.</li>
+     * <li>No {@code readerInstanceId} is provided (no filter — all messages visible)</li>
+     * <li>The message has no target (broadcast)</li>
+     * <li>Target is {@code instance:<readerInstanceId>} — exact instance match</li>
+     * <li>Target is {@code capability:X} or {@code role:X} — and the reader has that full target string
+     * as a tag in their registered Capability rows. The full target string is the tag:
+     * {@code "capability:code-review"} matches tag {@code "capability:code-review"},
+     * {@code "role:reviewer"} matches tag {@code "role:reviewer"}.</li>
      * </ul>
-     *
-     * <p>
-     * Capability and role targets are handled in a later phase (#30).
      */
     private boolean isVisibleToReader(Message m, String readerInstanceId) {
         if (readerInstanceId == null || readerInstanceId.isBlank()) {
@@ -393,7 +394,17 @@ public class QhorusMcpTools {
         if (m.target == null) {
             return true;
         }
-        return m.target.equals("instance:" + readerInstanceId);
+        if (m.target.equals("instance:" + readerInstanceId)) {
+            return true;
+        }
+        if (m.target.startsWith("capability:") || m.target.startsWith("role:")) {
+            // The full target string is the capability tag stored at registration time.
+            // e.g. "capability:code-review" → agent registered with tag "capability:code-review"
+            //      "role:reviewer"          → agent registered with tag "role:reviewer"
+            List<String> readerTags = instanceService.findCapabilityTagsForInstance(readerInstanceId);
+            return readerTags.contains(m.target);
+        }
+        return false;
     }
 
     /** EPHEMERAL: deliver messages visible to this reader then delete only those. */
