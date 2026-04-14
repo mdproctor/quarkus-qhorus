@@ -1,9 +1,11 @@
 package io.quarkiverse.qhorus.runtime.api;
 
+import java.util.List;
 import java.util.UUID;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import jakarta.transaction.Transactional;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
@@ -13,8 +15,13 @@ import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 
+import io.quarkiverse.qhorus.runtime.channel.Channel;
+import io.quarkiverse.qhorus.runtime.channel.ChannelService;
 import io.quarkiverse.qhorus.runtime.config.QhorusConfig;
 import io.quarkiverse.qhorus.runtime.mcp.QhorusMcpTools;
+import io.quarkiverse.qhorus.runtime.message.Message;
+import io.quarkiverse.qhorus.runtime.message.MessageService;
+import io.quarkiverse.qhorus.runtime.message.MessageType;
 
 /**
  * Optional A2A-compatible REST endpoint layer.
@@ -49,6 +56,12 @@ public class A2AResource {
 
     @Inject
     QhorusMcpTools tools;
+
+    @Inject
+    MessageService messageService;
+
+    @Inject
+    ChannelService channelService;
 
     @POST
     @Path("/message:send")
@@ -98,12 +111,50 @@ public class A2AResource {
 
     @GET
     @Path("/tasks/{id}")
+    @Transactional
     public Response getTask(@PathParam("id") String taskId) {
         if (!config.a2a().enabled()) {
             return A2A_DISABLED;
         }
-        // Implemented in #35
-        return Response.status(Response.Status.NOT_IMPLEMENTED).build();
+
+        List<Message> messages = messageService.findAllByCorrelationId(taskId);
+        if (messages.isEmpty()) {
+            return Response.status(Response.Status.NOT_FOUND)
+                    .entity("{\"error\":\"Task not found: " + taskId + "\"}")
+                    .type(MediaType.APPLICATION_JSON)
+                    .build();
+        }
+
+        // Channel name from the first message
+        Channel channel = channelService.findById(messages.get(0).channelId)
+                .orElseThrow(() -> new IllegalStateException("Channel not found for task " + taskId));
+
+        String state = deriveState(messages);
+
+        List<A2AMessage> history = messages.stream()
+                .map(m -> new A2AMessage(
+                        m.sender,
+                        m.content != null ? List.of(new A2APart("text", m.content)) : List.of(),
+                        null,
+                        m.correlationId,
+                        channel.name))
+                .toList();
+
+        return Response.ok(new Task(taskId, channel.name, new TaskStatus(state), history)).build();
+    }
+
+    private static String deriveState(List<Message> messages) {
+        for (Message m : messages) {
+            if (m.messageType == MessageType.RESPONSE || m.messageType == MessageType.DONE) {
+                return "completed";
+            }
+        }
+        for (Message m : messages) {
+            if (m.messageType == MessageType.STATUS) {
+                return "working";
+            }
+        }
+        return "submitted";
     }
 
     private static Response error400(String message) {

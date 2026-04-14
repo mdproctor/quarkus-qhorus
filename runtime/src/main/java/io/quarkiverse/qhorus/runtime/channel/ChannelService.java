@@ -26,6 +26,10 @@ public class ChannelService {
         return Channel.find("name", name).firstResultOptional();
     }
 
+    public Optional<Channel> findById(UUID id) {
+        return Channel.findByIdOptional(id);
+    }
+
     public List<Channel> listAll() {
         return Channel.listAll();
     }

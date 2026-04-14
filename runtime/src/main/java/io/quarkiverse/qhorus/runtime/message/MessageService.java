@@ -86,6 +86,11 @@ public class MessageService {
         return Message.find("correlationId", correlationId).firstResultOptional();
     }
 
+    /** Returns all messages with the given correlation ID ordered by id ascending. */
+    public List<Message> findAllByCorrelationId(String correlationId) {
+        return Message.<Message> find("correlationId = ?1 ORDER BY id ASC", correlationId).list();
+    }
+
     /**
      * Register or update a PendingReply row for the given correlation ID.
      * Upserts — if a row already exists, updates expiresAt rather than inserting a duplicate.
