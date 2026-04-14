@@ -103,6 +103,11 @@ Qhorus publishes `/.well-known/agent-card.json` in the A2A format, making every 
 - Concurrent requests in flight simultaneously is not a concern
 - You want ~500 lines of code you can read and modify in an afternoon
 
+Note: "Quarkiverse conventions" are a one-time setup cost, not an ongoing tax.
+Once the scaffold is correct, day-to-day Qhorus development is plain Quarkus.
+The conventions are also largely mitigated by the Quarkiverse project generator
+at code.quarkus.io — the discovery cost only bites when scaffolding manually.
+
 **Qhorus** is the right tool when:
 - You have N agents from multiple frameworks (not just Claude)
 - Concurrent requests are in flight simultaneously — the correlation ID safety matters
