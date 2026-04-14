@@ -1,133 +1,132 @@
 # Qhorus vs cross-claude-mcp
 
-> This document compares Qhorus (Quarkus Native) with its predecessor
-> [cross-claude-mcp](https://github.com/rblank9/cross-claude-mcp) (Node.js),
-> explaining what each is optimised for and why the differences exist.
+> cross-claude-mcp is the Node.js MCP server that Qhorus grew out of. This document
+> explains what Qhorus adds, why each design decision diverges from the original,
+> and which tool fits which situation.
 
 ---
 
 ## Feature comparison
 
-| Feature | cross-claude-mcp (Node.js) | Qhorus (Quarkus Native) |
+| Feature | cross-claude-mcp (Node.js) | Qhorus (Quarkus) |
 |---|---|---|
-| Channel semantics | Single type — append only | 5 semantics: APPEND, COLLECT, BARRIER, EPHEMERAL, LAST_WRITE |
-| Message types | 6 (no observer-only type) | 7 — adds `event` (observer-only telemetry, excluded from agent context) |
-| `wait_for_reply` | Polls any new message from a non-self sender | UUID correlation IDs, keyed to PendingReply rows — concurrent waits are safe |
-| Shared data | Blob stored by key, inline in message content | UUID artefact refs + claim/release lifecycle + chunked streaming |
-| Instance addressing | By `instance_id` only | By id · by `capability:tag` · by `role:name` (tag-based broadcast) |
-| HandoffMessage safety | No enforcement | Terminal for turn; in-flight results discarded on handoff |
+| Channel semantics | Append only | 5 declared semantics: APPEND, COLLECT, BARRIER, EPHEMERAL, LAST_WRITE — enforced server-side |
+| Message types | 6 types, all visible to agents | 7 types — adds `event` (observer-only, excluded from agent context) |
+| `wait_for_reply` | Polls any new message from non-self sender | UUID correlation IDs — multiple concurrent waits are safe by construction |
+| Shared data | Blob inline in message content | UUID artefact refs + claim/release lifecycle + chunked streaming |
+| Instance addressing | By `instance_id` only | By id · by `capability:tag` · by `role:name` |
+| HandoffMessage | No enforcement — agent can keep producing after handoff | Terminal — in-flight results discarded once handoff is produced |
 | Termination conditions | `done` message only | Composable: done · max-messages · keyword · timeout · functional predicate |
 | Agent discovery | None | `/.well-known/agent-card.json` (A2A compatible) |
-| Transport | stdio + legacy SSE + Streamable HTTP | Streamable HTTP (MCP spec 2025-06-18) only |
 | LLM compatibility | Primarily Claude | Any MCP-capable agent — Claude, Cursor, OpenAI, custom frameworks |
-| Runtime | Node.js ~80 MB, seconds to ready | GraalVM native ~30 MB, milliseconds to ready (no warm-up) |
-| Database | SQLite / PostgreSQL (raw SQL, schema is disposable) | Panache ORM + Flyway versioned migrations — schema survives upgrades |
-| Embeddable | No | Yes — consumed as a Maven dependency by Claudony |
+| Transport | stdio + legacy SSE + Streamable HTTP | Streamable HTTP (MCP spec 2025-06-18) |
+| Runtime | Node.js ~80 MB, seconds to ready | GraalVM native ~30 MB, milliseconds to ready — no warm-up ¹ |
+| Database | SQLite / PostgreSQL, raw SQL, schema is disposable | Panache ORM + Flyway — versioned migrations, schema survives upgrades |
+| Embeddable | No | Yes — Maven dependency, consumed by Claudony |
+
+> ¹ GraalVM native is the target architecture. The build profile and GraalVM 25 are configured. Native
+> validation is planned once the full tool surface is stable (after Phases 5–7).
 
 ---
 
-## Why each difference exists
+## Why each design decision diverges
 
-### Channel semantics — 5 types instead of append-only
+### Channel semantics
 
-cross-claude-mcp has one implicit semantic: ordered append. This works for simple conversation threads but breaks for three common multi-agent patterns:
+cross-claude-mcp has one implicit behaviour: ordered append. That handles conversation threads but breaks three patterns that come up constantly in real multi-agent systems:
 
 - **Fan-in** — multiple agents contribute, one reads the aggregate → needs COLLECT
 - **Join gates** — proceed only when all named contributors have written → needs BARRIER
-- **Authoritative state** — one writer; concurrent writes are a protocol error → needs LAST_WRITE
+- **Authoritative state** — one writer; a second concurrent writer is a bug → needs LAST_WRITE
 
-Without declared semantics, agents implement these patterns in their prompts, with no enforcement. Race conditions only appear as wrong output, not as errors. Declaring semantics at channel creation makes the contract explicit and enforceable server-side — borrowed from LangGraph's Pregel model.
+Without declared semantics, agents implement these patterns in prompts with no enforcement. Race conditions surface as wrong output, not as errors — the hardest kind to debug. Qhorus declares the contract at channel creation and enforces it server-side, borrowing the model from LangGraph's Pregel state reducers.
 
-### `wait_for_reply` — correlation IDs instead of sender filtering
+### `wait_for_reply`
 
-The original polls for any new message from a non-self sender. Under concurrent requests — Alice waiting for Bob's reply while also waiting for Carol's reply — message N+1 might be Carol's reply to a different request. Alice receives it and misattributes it.
+The original polls for any new message from a non-self sender. Under concurrent requests — Alice waiting for Bob's reply while simultaneously waiting for Carol's — message N+1 might be Carol's answer to a different question. Alice gets it and misattributes it.
 
-Qhorus uses UUID correlation IDs keyed to PendingReply rows. Each `request` carries a `correlation_id`; `wait_for_reply` registers a row and wakes only when a `response` carries the matching ID. Multiple concurrent waits are safe by construction, not by convention.
+Qhorus uses UUID correlation IDs. Each `request` carries one; `wait_for_reply` registers a PendingReply row and wakes only on a matching `response`. Multiple concurrent waits are safe by construction, not by agent discipline.
 
-### Artefacts — UUID refs instead of inline payloads
+### Shared data and artefacts
 
-cross-claude-mcp puts data inline in message `content`. Two failure modes:
+Inline message content fails two ways at scale: large payloads hit MCP message size limits, and the same large payload gets duplicated in memory for every receiver.
 
-1. Large content (analysis, plans, code) bloats the message table and hits MCP message size limits.
-2. If multiple agents receive the same large payload, it is duplicated in memory for each.
+Qhorus stores artefacts once and passes UUID references. Claim/release reference counting lets GC know when it is safe to delete — artefacts are not on a timer, they are cleaned up when all claiming agents have explicitly released them. Chunked streaming (`append + last_chunk`, borrowed from A2A's `TaskArtifactUpdateEvent`) handles outputs that exceed a single tool call.
 
-Qhorus stores artefacts once, passes UUID references on messages, and uses claim/release reference counting so GC knows when it is safe to clean up. Chunked streaming (`append + last_chunk`) handles outputs that exceed a single tool call — borrowed from A2A's `TaskArtifactUpdateEvent` pattern.
+### Instance addressing
 
-### Addressing — capability and role modes
+The original routes by `instance_id` only — the sender must know exactly who to reach. This breaks when agent pools are dynamic or when you want any available specialist rather than a specific one.
 
-The original routes to `instance_id` only — the sender must know exactly who to reach. This breaks for dynamic agent pools where the set of available agents changes, and for broadcast patterns where all agents with a given skill should respond.
+Qhorus adds two modes from Letta's tag-based dispatch model:
+- `capability:code-review` — any online instance with that tag
+- `role:reviewer` — all instances with that role (broadcast + fan-in)
 
-Qhorus adds two addressing modes borrowed from Letta's tag-based dispatch:
-- `capability:code-review` — any available instance with that tag (load-balance or first-responder)
-- `role:reviewer` — all instances in that role (broadcast + collect)
+Agent identity and agent capability are decoupled. Pool membership can change without the sender caring.
 
-This decouples agent identity from agent capability and enables dynamic pool management without re-wiring sender logic.
+### The `event` message type
 
-### `event` message type — clean observability boundary
+All six of cross-claude-mcp's message types appear in agent context. System signals, routing decisions, and queue metrics land in the same stream as work messages. Agents filter noise; prompt pollution is a real risk.
 
-The original's six message types all appear in agent context. Routing decisions, queue depths, and system signals are mixed in with work messages, forcing agents to filter noise and risking prompt pollution.
+`event` is never delivered to agents. It exists solely for dashboards, telemetry pipelines, and orchestration layers — Claudony, observability tools, the humans watching the system. The separation is enforced at the query level: every agent-facing query explicitly excludes EVENT.
 
-`event` is excluded from agent context entirely — it exists for dashboards, telemetry pipelines, and orchestration layers. Separation keeps agent prompts clean and makes system observability a first-class concern without coupling it to agent behaviour.
+### HandoffMessage safety
 
-### HandoffMessage is terminal
+The original applies no enforcement after a `handoff` is sent. An agent can produce a handoff and continue generating tool results in the same turn. If those results arrive after the handoff recipient has started work, the last writer wins silently — the exact race that causes subtle wrong-state bugs in AutoGen and Swarm.
 
-The original has no enforcement of handoff semantics. An agent can produce a `handoff` and then continue producing tool results in the same turn. If those results arrive after the handoff recipient has started work, the last writer wins silently — the same race condition that causes subtle bugs in AutoGen and Swarm pipelines.
+Qhorus treats `handoff` as terminal for a turn. Anything produced after it is logged and discarded.
 
-Qhorus enforces that `handoff` is terminal: any in-flight results for that turn are logged and discarded once a `handoff` is produced.
+### Versioned schema vs disposable database
 
-### Versioned schema migrations instead of a disposable database
+cross-claude-mcp uses its database as scratch space: if the schema changes, restart with a fresh file. That is reasonable because its state is transient — agents connect, coordinate, and disconnect. Nothing in the database needs to outlive a restart.
 
-cross-claude-mcp treats its database as ephemeral — if the schema changes, restart with a fresh SQLite file. This works because the state it holds is transient: agents connect, coordinate, and disconnect. Nothing in the database needs to survive a server restart or a schema change.
+Qhorus persists state that matters across restarts:
+- Channel history may be important after a service restart
+- `PendingReply` rows track in-flight `wait_for_reply` calls — lose them and callers are stuck
+- `ArtefactClaim` reference counts gate GC — lose them and artefacts are deleted while agents are still using them
+- Multiple instances sharing one database must agree on schema version
 
-Qhorus uses Flyway versioned migrations because its state carries meaning across restarts:
+Flyway versioned migrations are the price of that durability guarantee. cross-claude-mcp says "state is ephemeral, restart freely." Qhorus says "state is durable, upgrade without data loss."
 
-- Channel history may matter after a service restart
-- `PendingReply` rows must survive a restart or `wait_for_reply` callers lose their correlation ID tracking
-- `ArtefactClaim` reference counts must survive — if they're lost, artefacts get GC'd while agents are still consuming them
-- Multiple instances may share one database, and they must agree on schema version
+### GraalVM native image
 
-The migration concern is the price of the persistence guarantee. cross-claude-mcp implicitly says "state is ephemeral, restart freely." Qhorus says "state is durable, upgrade without data loss."
+The size difference (80 MB → 30 MB) understates the change. The more significant difference is execution model. GraalVM native image eliminates the JVM at runtime entirely: no bytecode interpretation, no JIT compilation, no class loading. Quarkus performs all of that work at build time — CDI wiring, classpath scanning, proxy generation, config binding. The resulting binary starts in milliseconds and runs at full throughput from the first request.
 
-### GraalVM native image — no warm-up, not just smaller
+For an embedded coordination service, warm-up is not an academic concern. A JVM process taking 3–5 seconds to reach steady state is acceptable for a long-running web server; it is noticeable when Claudony is launching Qhorus as a dependency alongside other services.
 
-The runtime size comparison (80 MB vs 30 MB) understates the difference. The more significant change is execution model: GraalVM native image eliminates the JVM entirely at runtime. There is no bytecode interpretation, no JIT compilation, no class loading. Quarkus moves all of that — classpath scanning, CDI wiring, proxy generation, config binding — to build time. The resulting binary starts in milliseconds and performs at full speed from the first request.
-
-For an embedded coordination service like Qhorus, warm-up matters: a JVM process taking 3–5 seconds to reach steady state is acceptable for a long-running web server, but noticeable when Claudony is launching Qhorus as a dependency.
-
-> **Current status:** Native is the target architecture. The native build profile is configured and GraalVM 25 is installed. Native validation is planned after Phases 5–7 complete and the full tool surface is stable.
+Quarkus handles the Qhorus-specific native requirements: `quarkus-flyway-deployment` registers migration scripts for inclusion in the binary, `quarkus-scheduler` has native support, and Panache entities are covered by `quarkus-hibernate-orm-panache-deployment`.
 
 ### LLM-agnostic by design
 
-cross-claude-mcp was built for Claude specifically. Qhorus is LLM-agnostic: it is an MCP server, and MCP is an open standard. Any agent with an MCP client — Claude, Cursor, OpenAI with MCP support, custom frameworks, AutoGen with an MCP adapter — can connect to Qhorus and participate in the same channels. A Claude agent and a GPT-4o agent can collaborate on the same Qhorus channel today without any changes to Qhorus.
+cross-claude-mcp was built for Claude. Qhorus is built on MCP, which is an open standard with growing multi-vendor support. Any agent with an MCP client can connect — Claude, Cursor, OpenAI, a custom framework with an MCP adapter. A Claude agent and a GPT-4o agent can work on the same Qhorus channel without any changes to Qhorus.
 
-The `claudony_session_id` field on Instance is always optional — Qhorus works standalone without Claudony.
+The `claudony_session_id` field on Instance is always optional. Qhorus works standalone without Claudony, and without Claude.
 
 ### Agent Card
 
-cross-claude-mcp has no discovery mechanism. Any external orchestrator must be manually configured to know the server exists.
+cross-claude-mcp has no discovery mechanism. External orchestrators need manual configuration to find it.
 
-Qhorus publishes `/.well-known/agent-card.json` in the A2A format, making every deployment self-describing and discoverable by Google A2A orchestrators, Claudony, and any other ecosystem tool that reads agent cards.
+Qhorus publishes `/.well-known/agent-card.json` in A2A format, making every deployment self-describing. Google A2A orchestrators, Claudony, and any ecosystem tool that reads agent cards can discover and describe a Qhorus instance without prior configuration.
 
 ---
 
 ## When to use each
 
 **cross-claude-mcp** is the right tool when:
-- You need something running in 30 seconds with zero infrastructure
-- You have a single Claude instance coordinating with itself
-- Concurrent requests in flight simultaneously is not a concern
-- You want ~500 lines of code you can read and modify in an afternoon
+- You need something running in minutes with no infrastructure
+- You are coordinating a single Claude instance with itself
+- Concurrent in-flight requests are not a concern
+- You want ~500 lines of readable code you can fork and modify in an afternoon
 
 **Qhorus** is the right tool when:
-- You have N agents from multiple frameworks — not just Claude
-- Concurrent requests are in flight simultaneously — the correlation ID safety matters
-- You want COLLECT fan-in or BARRIER join gates with server-side enforcement
-- You want humans to interject into agent channels in real-time (`event` type)
-- You are embedding in a larger system (Claudony) or distributing as a library
-- You want A2A discoverability and ecosystem compatibility
+- Agents from multiple frameworks or LLMs need to coordinate
+- Multiple requests can be in flight simultaneously and correct response attribution matters
+- You want fan-in (COLLECT) or join gates (BARRIER) enforced by the server, not by prompt conventions
+- Humans need to interject into agent conversations in real-time
+- You are embedding a coordination layer into a larger system
 - State must survive restarts and schema upgrades
+- You want A2A discoverability out of the box
 
-**A note on Quarkiverse conventions:** Qhorus is built as a Quarkiverse extension, which has scaffolding conventions (parent POM structure, deployment module, annotation processor paths). These are a one-time setup cost, not an ongoing tax. Once the scaffold is correct, day-to-day development is plain Quarkus. The conventions are also largely mitigated by the Quarkiverse project generator at code.quarkus.io — the discovery cost only bites when scaffolding manually.
+The one overhead worth naming: Qhorus is a Quarkiverse extension, so the initial scaffold follows Quarkiverse conventions — a three-module Maven structure, deployment module, annotation processor configuration. This is a one-time setup cost, not an ongoing development tax, and it is largely automated by the Quarkiverse project generator at code.quarkus.io.
 
 ---
 
