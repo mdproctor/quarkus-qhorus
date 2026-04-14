@@ -12,6 +12,8 @@ Primary design specification: `docs/specs/2026-04-13-qhorus-design.md`
 
 How Qhorus relates to A2A and ACP: `docs/agent-protocol-comparison.md`
 
+Full multi-agent framework comparison (Qhorus, A2A, ACP, AutoGen, LangGraph, CrewAI, Letta, Swarm, MCP): `docs/multi-agent-framework-comparison.md`
+
 ---
 
 ## Component Structure
