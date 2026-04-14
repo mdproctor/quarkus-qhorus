@@ -13,13 +13,28 @@ public class ChannelService {
 
     @Transactional
     public Channel create(String name, String description, ChannelSemantic semantic, String barrierContributors) {
+        return create(name, description, semantic, barrierContributors, null);
+    }
+
+    @Transactional
+    public Channel create(String name, String description, ChannelSemantic semantic, String barrierContributors,
+            String allowedWriters) {
         Channel channel = new Channel();
         channel.name = name;
         channel.description = description;
         channel.semantic = semantic;
         channel.barrierContributors = barrierContributors;
+        channel.allowedWriters = (allowedWriters == null || allowedWriters.isBlank()) ? null : allowedWriters;
         channel.persist();
         return channel;
+    }
+
+    @Transactional
+    public Channel setAllowedWriters(String name, String allowedWriters) {
+        Channel ch = findByName(name)
+                .orElseThrow(() -> new IllegalArgumentException("Channel not found: " + name));
+        ch.allowedWriters = (allowedWriters == null || allowedWriters.isBlank()) ? null : allowedWriters;
+        return ch;
     }
 
     public Optional<Channel> findByName(String name) {

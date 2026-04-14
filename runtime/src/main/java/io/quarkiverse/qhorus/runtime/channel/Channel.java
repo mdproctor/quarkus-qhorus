@@ -33,6 +33,13 @@ public class Channel extends PanacheEntityBase {
     @Column(name = "barrier_contributors", columnDefinition = "TEXT")
     public String barrierContributors;
 
+    /**
+     * Comma-separated list of allowed writers. Each entry is a bare instance ID, or a
+     * {@code capability:tag} / {@code role:name} pattern. Null = open (any writer permitted).
+     */
+    @Column(name = "allowed_writers", columnDefinition = "TEXT")
+    public String allowedWriters;
+
     /** When true, send_message is blocked and check_messages returns empty + paused status. */
     @Column(nullable = false)
     public boolean paused = false;

@@ -51,7 +51,7 @@ Seven Panache entities across four packages. All use UUID primary keys set in
 
 | Entity | Key Fields | Notes |
 |---|---|---|
-| `Channel` | `id UUID`, `name` (unique), `semantic`, `barrierContributors`, `createdAt`, `lastActivityAt` | `semantic` is `ChannelSemantic` enum |
+| `Channel` | `id UUID`, `name` (unique), `semantic`, `barrierContributors`, `allowedWriters`, `createdAt`, `lastActivityAt` | `allowedWriters`: nullable TEXT — comma-separated instance IDs and/or `capability:tag` / `role:name` patterns; null = open |
 | `ChannelSemantic` | `APPEND \| COLLECT \| BARRIER \| EPHEMERAL \| LAST_WRITE` | Enum; stored as STRING |
 
 ### Message (`runtime/message/`)
@@ -84,7 +84,7 @@ All services are `@ApplicationScoped`. Mutating methods are `@Transactional`.
 
 | Service | Package | Responsibilities |
 |---|---|---|
-| `ChannelService` | `runtime.channel` | create, findByName, listAll, updateLastActivity |
+| `ChannelService` | `runtime.channel` | create, findByName, setAllowedWriters, listAll, updateLastActivity |
 | `MessageService` | `runtime.message` | send (increments `replyCount`, updates `channel.lastActivityAt`), pollAfter (excludes EVENT), findById, findByCorrelationId |
 | `InstanceService` | `runtime.instance` | register (upsert + capability replacement), heartbeat, findByInstanceId, findByCapability, listAll, markStaleOlderThan |
 | `DataService` | `runtime.data` | store (create or chunked append), getByKey, getByUuid, listAll, claim, release, isGcEligible |
@@ -123,7 +123,8 @@ All tools exposed via `QhorusMcpTools` (`@ApplicationScoped`) at the `/mcp` Stre
 ### Channel management
 | Tool | Returns | Notes |
 |---|---|---|
-| `create_channel` | `ChannelDetail` | Parses semantic string; defaults to APPEND |
+| `create_channel` | `ChannelDetail` | Parses semantic string; defaults to APPEND; optional `allowed_writers` ACL |
+| `set_channel_writers` | `ChannelDetail` | Update write ACL on existing channel; null clears ACL (opens to all) |
 | `list_channels` | `List<ChannelDetail>` | Message counts fetched in single GROUP BY query (no N+1) |
 | `find_channel` | `List<ChannelDetail>` | Case-insensitive LIKE on name OR description |
 
@@ -162,6 +163,7 @@ All tools exposed via `QhorusMcpTools` (`@ApplicationScoped`) at the `/mcp` Stre
 - LAST_WRITE different-sender write throws `IllegalStateException` naming the current writer.
 - BARRIER with null/empty `barrierContributors` blocks permanently (configuration error guard).
 - EVENT messages are excluded from all agent-visible delivery paths and from BARRIER contributor tracking.
+- `send_message` enforces `allowed_writers` ACL when set — rejects senders not matching any entry (bare instance ID, `capability:tag`, or `role:name`). EVENT messages bypass this check.
 
 ---
 
@@ -179,7 +181,7 @@ All tools exposed via `QhorusMcpTools` (`@ApplicationScoped`) at the `/mcp` Stre
 | **8 — Embed in Claudony** | ⬜ Pending | Unified MCP endpoint |
 | **9 — A2A compat** | ✅ Done | `POST /a2a/message:send`, `GET /a2a/tasks/{id}`; guarded by `quarkus.qhorus.a2a.enabled`; 29 tests |
 | **10 — Human-in-the-loop controls** | ✅ Done | pause/resume, approval gate, cancel_wait, force_release, revoke_artefact, delete_message, clear_channel, deregister_instance, channel_digest, watchdog alerting (optional); 103 tests |
-| **11 — Access control and governance** | ⬜ Pending | Per-channel write permissions; admin role; rate limiting per channel/instance; read-only observer mode |
+| **11 — Access control and governance** | 🔄 In Progress | Per-channel write permissions ✅ (Flyway V5, `allowed_writers` ACL, `set_channel_writers`, 23 tests); admin role ⬜; rate limiting ⬜; read-only observer mode ⬜ |
 | **12 — Structured observability** | ⬜ Pending | Mandatory `event` payload schema; `list_events` query tool; channel timeline API; audit trail queryable by time range and agent |
 
 ---

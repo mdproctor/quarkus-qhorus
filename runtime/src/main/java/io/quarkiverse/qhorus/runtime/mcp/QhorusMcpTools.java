@@ -71,7 +71,9 @@ public class QhorusMcpTools {
             String barrierContributors,
             long messageCount,
             String lastActivityAt,
-            boolean paused) {
+            boolean paused,
+            /** Comma-separated allowed-writer entries, or null if the channel is open to all writers. */
+            String allowedWriters) {
     }
 
     public record MessageResult(
@@ -263,6 +265,11 @@ public class QhorusMcpTools {
     // Channel management tools
     // ---------------------------------------------------------------------------
 
+    /** Convenience overload — no allowed_writers (open channel). Used by tests and internal callers. */
+    public ChannelDetail createChannel(String name, String description, String semantic, String barrierContributors) {
+        return createChannel(name, description, semantic, barrierContributors, null);
+    }
+
     @Tool(name = "create_channel", description = "Create a named channel with declared semantic. "
             + "Semantic defaults to APPEND if not specified.")
     @Transactional
@@ -270,7 +277,8 @@ public class QhorusMcpTools {
             @ToolArg(name = "name", description = "Unique channel name") String name,
             @ToolArg(name = "description", description = "Channel purpose description") String description,
             @ToolArg(name = "semantic", description = "Channel semantic: APPEND (default), COLLECT, BARRIER, EPHEMERAL, LAST_WRITE", required = false) String semantic,
-            @ToolArg(name = "barrier_contributors", description = "Comma-separated contributor names (BARRIER channels only)", required = false) String barrierContributors) {
+            @ToolArg(name = "barrier_contributors", description = "Comma-separated contributor names (BARRIER channels only)", required = false) String barrierContributors,
+            @ToolArg(name = "allowed_writers", description = "Comma-separated allowed writers: bare instance IDs and/or capability:tag / role:name patterns. Null = open to all.", required = false) String allowedWriters) {
         ChannelSemantic sem;
         if (semantic == null || semantic.isBlank()) {
             sem = ChannelSemantic.APPEND;
@@ -282,8 +290,18 @@ public class QhorusMcpTools {
                         "Invalid semantic '" + semantic + "'. Valid values: APPEND, COLLECT, BARRIER, EPHEMERAL, LAST_WRITE");
             }
         }
-        Channel ch = channelService.create(name, description, sem, barrierContributors);
+        Channel ch = channelService.create(name, description, sem, barrierContributors, allowedWriters);
         return toChannelDetail(ch, 0L);
+    }
+
+    @Tool(name = "set_channel_writers", description = "Update the write ACL on an existing channel. "
+            + "Pass null or blank to open the channel to all writers.")
+    @Transactional
+    public ChannelDetail setChannelWriters(
+            @ToolArg(name = "channel_name", description = "Name of the channel to update") String channelName,
+            @ToolArg(name = "allowed_writers", description = "Comma-separated allowed writers (instance IDs and/or capability:tag / role:name). Null = open to all.", required = false) String allowedWriters) {
+        Channel ch = channelService.setAllowedWriters(channelName, allowedWriters);
+        return toChannelDetail(ch, Message.<Message> count("channelId", ch.id));
     }
 
     @Tool(name = "list_channels", description = "List all channels with message count and last activity.")
@@ -411,6 +429,13 @@ public class QhorusMcpTools {
         }
 
         MessageType msgType = MessageType.valueOf(type.toUpperCase());
+
+        // ACL check — EVENT messages bypass (telemetry always flows)
+        if (msgType != MessageType.EVENT && !isAllowedWriter(sender, ch.allowedWriters)) {
+            throw new IllegalStateException(
+                    "Sender '" + sender + "' is not permitted to write to channel '" + channelName
+                            + "'. Channel has an allowed_writers ACL. Use set_channel_writers to update it.");
+        }
         String corrId = correlationId;
         if (corrId == null && msgType == MessageType.REQUEST) {
             corrId = java.util.UUID.randomUUID().toString();
@@ -553,6 +578,44 @@ public class QhorusMcpTools {
      * {@code "role:reviewer"} matches tag {@code "role:reviewer"}.</li>
      * </ul>
      */
+    /**
+     * Returns true if {@code sender} is permitted to write to a channel with the given
+     * {@code allowedWriters} ACL string. Null or blank ACL = open to all.
+     *
+     * <p>
+     * Each comma-separated entry is one of:
+     * <ul>
+     * <li>A bare instance ID — matches sender exactly</li>
+     * <li>{@code capability:X} — matches if sender is registered with tag {@code capability:X}</li>
+     * <li>{@code role:X} — matches if sender is registered with tag {@code role:X}</li>
+     * </ul>
+     */
+    private boolean isAllowedWriter(String sender, String allowedWriters) {
+        if (allowedWriters == null || allowedWriters.isBlank()) {
+            return true;
+        }
+        List<String> senderTags = null; // lazy-loaded
+        for (String raw : allowedWriters.split(",")) {
+            String entry = raw.strip();
+            if (entry.isEmpty()) {
+                continue;
+            }
+            if (entry.startsWith("capability:") || entry.startsWith("role:")) {
+                if (senderTags == null) {
+                    senderTags = instanceService.findCapabilityTagsForInstance(sender);
+                }
+                if (senderTags.contains(entry)) {
+                    return true;
+                }
+            } else {
+                if (entry.equals(sender)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     private boolean isVisibleToReader(Message m, String readerInstanceId) {
         if (readerInstanceId == null || readerInstanceId.isBlank()) {
             return true;
@@ -1218,7 +1281,8 @@ public class QhorusMcpTools {
                 ch.barrierContributors,
                 messageCount,
                 ch.lastActivityAt.toString(),
-                ch.paused);
+                ch.paused,
+                ch.allowedWriters);
     }
 
     private WatchdogSummary toWatchdogSummary(io.quarkiverse.qhorus.runtime.watchdog.Watchdog w) {
