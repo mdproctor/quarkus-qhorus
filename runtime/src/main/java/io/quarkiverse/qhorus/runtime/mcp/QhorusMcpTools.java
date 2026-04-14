@@ -182,6 +182,28 @@ public class QhorusMcpTools {
             String message) {
     }
 
+    public record MessagePreview(
+            Long messageId,
+            String sender,
+            String messageType,
+            String contentPreview,
+            String createdAt) {
+    }
+
+    public record ChannelDigest(
+            String channelName,
+            String semantic,
+            boolean paused,
+            long messageCount,
+            Map<String, Integer> senderBreakdown,
+            Map<String, Integer> typeBreakdown,
+            int artefactRefCount,
+            List<String> activeAgents,
+            List<MessagePreview> recentMessages,
+            String oldestMessageAt,
+            String newestMessageAt) {
+    }
+
     // ---------------------------------------------------------------------------
     // Instance management tools
     // ---------------------------------------------------------------------------
@@ -1018,6 +1040,75 @@ public class QhorusMcpTools {
         instance.delete();
         return new DeregisterResult(instanceId, true,
                 "Instance '" + instanceId + "' deregistered");
+    }
+
+    @Tool(name = "channel_digest", description = "Return a structured human-readable summary of a channel's recent activity. "
+            + "Useful for human dashboards to understand state before intervening. "
+            + "Includes message count, sender/type breakdowns, artefact refs, recent messages (truncated), and timestamps.")
+    @Transactional
+    public ChannelDigest channelDigest(
+            @ToolArg(name = "channel_name", description = "Name of the channel to summarise") String channelName,
+            @ToolArg(name = "limit", description = "Max recent messages to include (default 10)", required = false) Integer limit) {
+        Channel ch = channelService.findByName(channelName)
+                .orElseThrow(() -> new IllegalArgumentException("Channel not found: " + channelName));
+
+        int pageSize = limit != null ? limit : 10;
+        List<Message> allMessages = Message.<Message> find(
+                "channelId = ?1 AND messageType != ?2 ORDER BY id ASC",
+                ch.id, MessageType.EVENT).list();
+
+        if (allMessages.isEmpty()) {
+            return new ChannelDigest(ch.name, ch.semantic.name(), ch.paused,
+                    0L, Map.of(), Map.of(), 0, List.of(), List.of(), null, null);
+        }
+
+        // Sender and type breakdowns
+        Map<String, Integer> senderBreakdown = new java.util.LinkedHashMap<>();
+        Map<String, Integer> typeBreakdown = new java.util.LinkedHashMap<>();
+        java.util.Set<String> artefactUuids = new java.util.LinkedHashSet<>();
+
+        for (Message m : allMessages) {
+            senderBreakdown.merge(m.sender, 1, Integer::sum);
+            typeBreakdown.merge(m.messageType.name(), 1, Integer::sum);
+            if (m.artefactRefs != null && !m.artefactRefs.isBlank()) {
+                for (String ref : m.artefactRefs.split(",")) {
+                    if (!ref.isBlank())
+                        artefactUuids.add(ref.strip());
+                }
+            }
+        }
+
+        // Active agents — sent a non-event message in the last 5 minutes
+        java.time.Instant cutoff = java.time.Instant.now().minusSeconds(300);
+        List<String> activeAgents = allMessages.stream()
+                .filter(m -> m.createdAt != null && m.createdAt.isAfter(cutoff))
+                .map(m -> m.sender)
+                .distinct()
+                .toList();
+
+        // Recent messages — last `pageSize`, newest first, content truncated
+        List<MessagePreview> recent = allMessages.stream()
+                .skip(Math.max(0, allMessages.size() - pageSize))
+                .map(m -> {
+                    String content = m.content != null ? m.content : "";
+                    String preview = content.length() > 120
+                            ? content.substring(0, 120) + "…"
+                            : content;
+                    return new MessagePreview(m.id, m.sender, m.messageType.name(),
+                            preview, m.createdAt != null ? m.createdAt.toString() : null);
+                })
+                .toList();
+
+        String oldest = allMessages.get(0).createdAt != null
+                ? allMessages.get(0).createdAt.toString()
+                : null;
+        String newest = allMessages.get(allMessages.size() - 1).createdAt != null
+                ? allMessages.get(allMessages.size() - 1).createdAt.toString()
+                : null;
+
+        return new ChannelDigest(ch.name, ch.semantic.name(), ch.paused,
+                allMessages.size(), senderBreakdown, typeBreakdown,
+                artefactUuids.size(), activeAgents, recent, oldest, newest);
     }
 
     // ---------------------------------------------------------------------------
