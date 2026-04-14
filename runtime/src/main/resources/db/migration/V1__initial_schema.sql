@@ -1,6 +1,6 @@
 -- Qhorus initial schema — Phase 1: Core data model
 -- Compatible with H2 (test) and PostgreSQL (production)
--- Tables added incrementally as each domain is implemented.
+-- Table order respects FK dependencies.
 
 -- -------------------------------------------------------------------------
 -- Channel
@@ -15,40 +15,6 @@ CREATE TABLE channel (
     last_activity_at TIMESTAMP    NOT NULL,
     CONSTRAINT pk_channel PRIMARY KEY (id),
     CONSTRAINT uq_channel_name UNIQUE (name)
-);
-
--- -------------------------------------------------------------------------
--- Message
--- -------------------------------------------------------------------------
-CREATE SEQUENCE message_seq START WITH 1 INCREMENT BY 50;
-
-CREATE TABLE message (
-    id              BIGINT       NOT NULL,
-    channel_id      UUID         NOT NULL,
-    sender          VARCHAR(255) NOT NULL,
-    message_type    VARCHAR(50)  NOT NULL,
-    content         TEXT,
-    correlation_id  VARCHAR(255),
-    in_reply_to     BIGINT,
-    reply_count     INT          NOT NULL DEFAULT 0,
-    artefact_refs   TEXT,
-    created_at      TIMESTAMP    NOT NULL,
-    CONSTRAINT pk_message PRIMARY KEY (id),
-    CONSTRAINT fk_message_channel FOREIGN KEY (channel_id) REFERENCES channel(id),
-    CONSTRAINT fk_message_reply FOREIGN KEY (in_reply_to) REFERENCES message(id)
-);
-
--- -------------------------------------------------------------------------
--- Pending Reply (correlation ID tracking for wait_for_reply)
--- -------------------------------------------------------------------------
-CREATE TABLE pending_reply (
-    id              UUID         NOT NULL,
-    correlation_id  VARCHAR(255) NOT NULL,
-    instance_id     UUID,
-    channel_id      UUID,
-    expires_at      TIMESTAMP,
-    CONSTRAINT pk_pending_reply PRIMARY KEY (id),
-    CONSTRAINT uq_pending_reply_corr_id UNIQUE (correlation_id)
 );
 
 -- -------------------------------------------------------------------------
@@ -79,6 +45,42 @@ CREATE TABLE capability (
 );
 
 -- -------------------------------------------------------------------------
+-- Message (sequence PK preserves ordering)
+-- -------------------------------------------------------------------------
+CREATE SEQUENCE message_seq START WITH 1 INCREMENT BY 50;
+
+CREATE TABLE message (
+    id              BIGINT       NOT NULL,
+    channel_id      UUID         NOT NULL,
+    sender          VARCHAR(255) NOT NULL,
+    message_type    VARCHAR(50)  NOT NULL,
+    content         TEXT,
+    correlation_id  VARCHAR(255),
+    in_reply_to     BIGINT,
+    reply_count     INT          NOT NULL DEFAULT 0,
+    artefact_refs   TEXT,
+    created_at      TIMESTAMP    NOT NULL,
+    CONSTRAINT pk_message PRIMARY KEY (id),
+    CONSTRAINT fk_message_channel FOREIGN KEY (channel_id) REFERENCES channel(id),
+    CONSTRAINT fk_message_reply FOREIGN KEY (in_reply_to) REFERENCES message(id)
+);
+
+-- -------------------------------------------------------------------------
+-- Pending Reply (correlation ID tracking for wait_for_reply — Phase 4)
+-- -------------------------------------------------------------------------
+CREATE TABLE pending_reply (
+    id              UUID         NOT NULL,
+    correlation_id  VARCHAR(255) NOT NULL,
+    instance_id     UUID,
+    channel_id      UUID,
+    expires_at      TIMESTAMP,
+    CONSTRAINT pk_pending_reply PRIMARY KEY (id),
+    CONSTRAINT uq_pending_reply_corr_id UNIQUE (correlation_id),
+    CONSTRAINT fk_pending_reply_instance FOREIGN KEY (instance_id) REFERENCES instance(id),
+    CONSTRAINT fk_pending_reply_channel FOREIGN KEY (channel_id) REFERENCES channel(id)
+);
+
+-- -------------------------------------------------------------------------
 -- Shared Data (artefact store)
 -- -------------------------------------------------------------------------
 CREATE TABLE shared_data (
@@ -104,5 +106,6 @@ CREATE TABLE artefact_claim (
     instance_id UUID      NOT NULL,
     claimed_at  TIMESTAMP NOT NULL,
     CONSTRAINT pk_artefact_claim PRIMARY KEY (id),
-    CONSTRAINT fk_artefact_claim_data FOREIGN KEY (artefact_id) REFERENCES shared_data(id)
+    CONSTRAINT fk_artefact_claim_data FOREIGN KEY (artefact_id) REFERENCES shared_data(id),
+    CONSTRAINT fk_artefact_claim_instance FOREIGN KEY (instance_id) REFERENCES instance(id)
 );

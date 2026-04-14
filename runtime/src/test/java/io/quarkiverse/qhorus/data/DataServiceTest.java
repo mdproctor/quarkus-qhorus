@@ -3,7 +3,6 @@ package io.quarkiverse.qhorus.data;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.List;
-import java.util.UUID;
 
 import jakarta.inject.Inject;
 
@@ -11,6 +10,8 @@ import org.junit.jupiter.api.Test;
 
 import io.quarkiverse.qhorus.runtime.data.DataService;
 import io.quarkiverse.qhorus.runtime.data.SharedData;
+import io.quarkiverse.qhorus.runtime.instance.Instance;
+import io.quarkiverse.qhorus.runtime.instance.InstanceService;
 import io.quarkus.test.TestTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 
@@ -19,6 +20,9 @@ class DataServiceTest {
 
     @Inject
     DataService dataService;
+
+    @Inject
+    InstanceService instanceService;
 
     @Test
     @TestTransaction
@@ -101,15 +105,28 @@ class DataServiceTest {
     @TestTransaction
     void claimAndReleaseLifecycle() {
         SharedData data = dataService.store("lifecycle-test", "desc", "alice", "content", false, true);
-        UUID instanceId = UUID.randomUUID();
+        // Use a real Instance so the FK constraint on artefact_claim.instance_id is satisfied
+        Instance claimant = instanceService.register("lifecycle-claimant", "Test agent", List.of());
 
-        dataService.claim(data.id, instanceId);
+        dataService.claim(data.id, claimant.id);
         assertFalse(dataService.isGcEligible(data.id),
                 "artefact with active claim should not be GC eligible");
 
-        dataService.release(data.id, instanceId);
+        dataService.release(data.id, claimant.id);
         assertTrue(dataService.isGcEligible(data.id),
                 "artefact with no claims should be GC eligible");
+    }
+
+    @Test
+    @TestTransaction
+    void storeOverwritesContentWhenAppendIsFalse() {
+        dataService.store("overwrite-key", "Original desc", "alice", "original content", false, true);
+        SharedData overwritten = dataService.store("overwrite-key", "New desc", "alice", "new content",
+                false, true);
+
+        assertEquals("new content", overwritten.content);
+        assertEquals("new content".length(), overwritten.sizeBytes);
+        assertTrue(overwritten.complete);
     }
 
     @Test

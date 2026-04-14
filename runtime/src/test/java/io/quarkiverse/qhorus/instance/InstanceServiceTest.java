@@ -50,6 +50,25 @@ class InstanceServiceTest {
 
     @Test
     @TestTransaction
+    void registerReplacesCapabilityTagsOnUpsert() {
+        // First registration: "python" only
+        instanceService.register("cap-agent", "Agent", List.of("python"));
+
+        // Re-register with different tags — "python" should be gone, "ml" should be present
+        instanceService.register("cap-agent", "Agent", List.of("ml"));
+
+        List<Instance> byPython = instanceService.findByCapability("python");
+        List<Instance> byMl = instanceService.findByCapability("ml");
+
+        assertTrue(byPython.isEmpty(),
+                "stale 'python' tag should be removed when re-registering with new tags");
+        assertEquals(1, byMl.size(),
+                "'ml' tag should be present after re-registration");
+        assertEquals("cap-agent", byMl.get(0).instanceId);
+    }
+
+    @Test
+    @TestTransaction
     void registerStoresCapabilityTags() {
         instanceService.register("carol", "Multi-skill agent", List.of("code-review", "test-writing", "docs"));
 
@@ -97,15 +116,32 @@ class InstanceServiceTest {
 
     @Test
     @TestTransaction
-    void markStaleChangesStatus() throws InterruptedException {
+    void markStaleChangesStatusForOldInstances() throws InterruptedException {
         instanceService.register("stale-agent", "Will go stale", List.of());
 
-        Thread.sleep(5);
-        instanceService.markStaleOlderThan(1); // 1 second threshold — any that haven't seen in 1s
+        // Wait longer than the 1-second threshold
+        Thread.sleep(1100);
+        instanceService.markStaleOlderThan(1);
 
-        // since we just registered, this won't be stale yet — but mark method should not error
+        // Bulk JPQL update bypasses Hibernate's first-level cache — clear it to see DB state
+        Instance.getEntityManager().clear();
+
         Instance inst = instanceService.findByInstanceId("stale-agent").orElseThrow();
-        // Status is still "online" since it was just registered (< 1 second ago)
-        assertEquals("online", inst.status);
+        assertEquals("stale", inst.status,
+                "instance not seen for > 1s should be marked stale");
+    }
+
+    @Test
+    @TestTransaction
+    void markStaleDoesNotAffectRecentInstances() throws InterruptedException {
+        instanceService.register("fresh-agent", "Recently active", List.of());
+
+        // threshold = 60s, agent was just registered — should NOT be marked stale
+        instanceService.markStaleOlderThan(60);
+        Instance.getEntityManager().clear();
+
+        Instance inst = instanceService.findByInstanceId("fresh-agent").orElseThrow();
+        assertEquals("online", inst.status,
+                "recently registered instance should remain online");
     }
 }

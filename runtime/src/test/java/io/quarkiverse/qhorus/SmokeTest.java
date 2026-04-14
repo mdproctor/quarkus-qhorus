@@ -53,7 +53,7 @@ class SmokeTest {
 
     @Test
     @TestTransaction
-    void fullMeshWorkflow() {
+    void fullMeshWorkflow() throws InterruptedException {
         // 1. Register two agents
         Instance alice = instanceService.register("smoke-alice", "Alice agent", List.of("code-review"));
         Instance bob = instanceService.register("smoke-bob", "Bob agent", List.of("testing"));
@@ -62,9 +62,13 @@ class SmokeTest {
         assertNotNull(bob.id);
         assertEquals("online", alice.status);
 
-        // 2. Create a channel
+        // 2. Create a channel — capture lastActivityAt at creation time
         Channel channel = channelService.create("smoke-channel", "Smoke test channel",
                 ChannelSemantic.APPEND, null);
+        var channelCreatedAt = channel.lastActivityAt;
+
+        // Brief pause so lastActivityAt can advance after messaging
+        Thread.sleep(5);
 
         assertNotNull(channel.id);
         assertEquals(ChannelSemantic.APPEND, channel.semantic);
@@ -104,7 +108,7 @@ class SmokeTest {
         // 8. Channel last activity advanced after messaging
         Optional<Channel> updatedChannel = channelService.findByName("smoke-channel");
         assertTrue(updatedChannel.isPresent());
-        assertTrue(updatedChannel.get().lastActivityAt.isAfter(channel.createdAt)
-                || updatedChannel.get().lastActivityAt.equals(channel.createdAt));
+        assertTrue(updatedChannel.get().lastActivityAt.isAfter(channelCreatedAt),
+                "channel.lastActivityAt should advance after messages are sent");
     }
 }

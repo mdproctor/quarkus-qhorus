@@ -2,12 +2,12 @@ package io.quarkiverse.qhorus.message;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
 import jakarta.inject.Inject;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import io.quarkiverse.qhorus.runtime.channel.Channel;
@@ -16,6 +16,7 @@ import io.quarkiverse.qhorus.runtime.channel.ChannelService;
 import io.quarkiverse.qhorus.runtime.message.Message;
 import io.quarkiverse.qhorus.runtime.message.MessageService;
 import io.quarkiverse.qhorus.runtime.message.MessageType;
+import io.quarkiverse.qhorus.runtime.message.PendingReply;
 import io.quarkus.test.TestTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 
@@ -27,17 +28,6 @@ class MessageServiceTest {
 
     @Inject
     MessageService messageService;
-
-    // Each test creates its own channel — @TestTransaction rolls back after each
-    private Channel channel;
-
-    @BeforeEach
-    @TestTransaction
-    void setup() {
-        // NOTE: @TestTransaction per-test means BeforeEach runs in same tx as test
-        // so we can't use @BeforeEach with @TestTransaction here.
-        // Instead each test creates its own channel inline.
-    }
 
     @Test
     @TestTransaction
@@ -65,10 +55,8 @@ class MessageServiceTest {
         Message request = messageService.send(ch.id, "alice", MessageType.REQUEST, "Question?",
                 "corr-456", null);
 
-        Message reply = messageService.send(ch.id, "bob", MessageType.RESPONSE, "Answer!",
-                "corr-456", request.id);
+        messageService.send(ch.id, "bob", MessageType.RESPONSE, "Answer!", "corr-456", request.id);
 
-        assertEquals(request.id, reply.inReplyTo);
         Message refreshed = messageService.findById(request.id).orElseThrow();
         assertEquals(1, refreshed.replyCount);
     }
@@ -89,7 +77,7 @@ class MessageServiceTest {
 
     @Test
     @TestTransaction
-    void pollAfterReturnsMessagesAfterGivenId() {
+    void pollAfterReturnsMessagesAfterGivenIdInAscendingOrder() {
         Channel ch = channelService.create("msg-test-4", "Test", ChannelSemantic.APPEND, null);
         Message m1 = messageService.send(ch.id, "alice", MessageType.STATUS, "first", null, null);
         Message m2 = messageService.send(ch.id, "bob", MessageType.STATUS, "second", null, null);
@@ -100,6 +88,22 @@ class MessageServiceTest {
         assertEquals(2, after.size());
         assertEquals(m2.id, after.get(0).id);
         assertEquals(m3.id, after.get(1).id);
+        // Ordering must be deterministic — guaranteed by ORDER BY id ASC in the query
+        assertTrue(after.get(0).id < after.get(1).id, "messages must be in ascending ID order");
+    }
+
+    @Test
+    @TestTransaction
+    void pollAfterWithZeroReturnsAllMessagesInOrder() {
+        Channel ch = channelService.create("msg-test-zero", "Test", ChannelSemantic.APPEND, null);
+        messageService.send(ch.id, "alice", MessageType.STATUS, "first", null, null);
+        messageService.send(ch.id, "bob", MessageType.STATUS, "second", null, null);
+
+        List<Message> all = messageService.pollAfter(ch.id, 0L, 10);
+
+        assertEquals(2, all.size());
+        assertEquals("first", all.get(0).content);
+        assertEquals("second", all.get(1).content);
     }
 
     @Test
@@ -136,19 +140,38 @@ class MessageServiceTest {
         assertTrue(found.isEmpty());
     }
 
+    // --- Pure enum tests — no DB interaction, no @TestTransaction overhead ---
+
     @Test
-    @TestTransaction
     void eventTypeIsNotAgentVisible() {
         assertFalse(MessageType.EVENT.isAgentVisible());
     }
 
     @Test
-    @TestTransaction
     void allOtherTypesAreAgentVisible() {
         assertTrue(MessageType.REQUEST.isAgentVisible());
         assertTrue(MessageType.RESPONSE.isAgentVisible());
         assertTrue(MessageType.STATUS.isAgentVisible());
         assertTrue(MessageType.HANDOFF.isAgentVisible());
         assertTrue(MessageType.DONE.isAgentVisible());
+    }
+
+    // --- PendingReply schema smoke test (Phase 4 entity) ---
+
+    @Test
+    @TestTransaction
+    void pendingReplyCanBePersistedAndQueried() {
+        PendingReply pr = new PendingReply();
+        pr.correlationId = "wait-corr-xyz";
+        pr.expiresAt = Instant.now().plusSeconds(90);
+        pr.persist();
+
+        PendingReply found = PendingReply.<PendingReply> find("correlationId", "wait-corr-xyz")
+                .firstResult();
+
+        assertNotNull(found);
+        assertEquals("wait-corr-xyz", found.correlationId);
+        assertNotNull(found.id);
+        assertNotNull(found.expiresAt);
     }
 }

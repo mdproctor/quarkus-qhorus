@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import io.quarkiverse.qhorus.runtime.channel.Channel;
 import io.quarkiverse.qhorus.runtime.channel.ChannelSemantic;
 import io.quarkiverse.qhorus.runtime.channel.ChannelService;
+import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.TestTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 
@@ -91,5 +92,19 @@ class ChannelServiceTest {
         Channel updated = channelService.findByName("active-ch").orElseThrow();
         assertTrue(updated.lastActivityAt.isAfter(original),
                 "lastActivityAt should advance after updateLastActivity");
+    }
+
+    @Test
+    void duplicateChannelNameThrowsException() {
+        // Use explicit transactions so each commit is independent and the unique
+        // constraint is actually checked against the DB (not just the Hibernate cache)
+        String uniqueName = "dup-test-" + System.nanoTime();
+        QuarkusTransaction.requiringNew().run(() -> channelService.create(uniqueName, "First", ChannelSemantic.APPEND, null));
+
+        assertThrows(Exception.class, () -> QuarkusTransaction.requiringNew()
+                .run(() -> channelService.create(uniqueName, "Second", ChannelSemantic.APPEND, null)));
+
+        // Cleanup the committed first record
+        QuarkusTransaction.requiringNew().run(() -> Channel.delete("name", uniqueName));
     }
 }

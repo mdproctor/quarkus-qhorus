@@ -50,7 +50,7 @@ public class MessageService {
      */
     public List<Message> pollAfter(UUID channelId, Long afterId, int limit) {
         return Message.find(
-                "channelId = ?1 AND id > ?2 AND messageType != ?3",
+                "channelId = ?1 AND id > ?2 AND messageType != ?3 ORDER BY id ASC",
                 channelId, afterId, MessageType.EVENT)
                 .page(0, limit)
                 .list();
