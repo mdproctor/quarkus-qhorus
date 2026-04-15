@@ -65,10 +65,14 @@ public class LedgerWriteService {
             return;
         }
 
-        // Parse JSON payload
+        // Parse JSON payload — only attempt if content looks like a JSON object
+        final String content = message.content;
+        if (content == null || !content.stripLeading().startsWith("{")) {
+            return; // free-form EVENT content; not a structured telemetry payload
+        }
         JsonNode root;
         try {
-            root = objectMapper.readTree(message.content);
+            root = objectMapper.readTree(content);
         } catch (Exception e) {
             LOG.warnf("LedgerWriteService: could not parse EVENT content as JSON for message %d — skipping. Error: %s",
                     message.id, e.getMessage());
