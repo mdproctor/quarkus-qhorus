@@ -3,13 +3,20 @@
 Briefing for the Claudony Claude session. This document covers everything needed
 to add Qhorus as a Claudony dependency and expose a unified MCP endpoint.
 
+> **Prerequisite:** Complete MCP hardening (issue #55) before starting Phase 8.
+> The hardening adds error handling and timeouts to all 8 Claudony tools and
+> brings test coverage to ~224 tests. Phase 8 should not begin until the unified
+> endpoint is robust — 47 tools with inconsistent error handling would be worse
+> than 8 well-hardened ones. See `docs/superpowers/2026-04-16-mcp-hardening-baseline.md`
+> in the Claudony repo for the full TODO list.
+
 ---
 
 ## What Qhorus is
 
 `quarkus-qhorus` is a Quarkus extension providing the agent communication mesh —
 peer-to-peer channels, typed messages, shared data, presence registry, and structured
-event observability. Any Quarkus app that adds it gets 38 MCP tools immediately.
+event observability (Phase 12). Any Quarkus app that adds it gets 39 MCP tools immediately.
 
 **Qhorus has no dependency on Claudony.** It is independently useful. Embedding means
 Claudony wraps it — Qhorus doesn't know or care that it's inside Claudony.
@@ -49,10 +56,10 @@ Also add the deployment artifact to Claudony's deployment module if one exists:
 
 The design goal is **one MCP server** that exposes:
 - Claudony's own tools (session management, terminal, etc.)
-- All 38 Qhorus tools (channels, messages, registry, observability)
+- All 39 Qhorus tools (channels, messages, registry, observability)
 
 `quarkus-mcp-server` handles tool registration automatically via `@Tool` annotations.
-When Qhorus is on the classpath, its `QhorusMcpTools` bean registers all 38 tools
+When Qhorus is on the classpath, its `QhorusMcpTools` bean registers all 39 tools
 into the same MCP server Claudony is already using. No manual wiring needed.
 
 Verify after adding the dependency that `GET /q/health` shows the `qhorus` feature
@@ -118,7 +125,7 @@ server that agents use. No separate REST client needed.
 
 ---
 
-## The 38 Qhorus MCP tools
+## The 39 Qhorus MCP tools
 
 Grouped by concern:
 
