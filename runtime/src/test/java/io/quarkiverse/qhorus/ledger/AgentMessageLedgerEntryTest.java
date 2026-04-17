@@ -73,11 +73,10 @@ class AgentMessageLedgerEntryTest {
     void baseFields_inheritedFromLedgerEntry() {
         final AgentMessageLedgerEntry entry = new AgentMessageLedgerEntry();
         entry.actorId = "agent-1";
-        entry.correlationId = "trace-abc";
         entry.sequenceNumber = 3;
 
         assertEquals("agent-1", entry.actorId);
-        assertEquals("trace-abc", entry.correlationId);
         assertEquals(3, entry.sequenceNumber);
+        // correlationId moved to ObservabilitySupplement in ledger supplement refactoring
     }
 }

@@ -116,7 +116,10 @@ class AgentLedgerCaptureTest {
         final List<AgentMessageLedgerEntry> entries = ledgerRepo.findByChannelId(
                 channelIdFor("alc-capture-4"));
 
-        assertEquals("trace-abc-123", entries.get(0).correlationId);
+        // correlationId is now in ObservabilitySupplement; verify via supplementJson or lazy accessor
+        final var obs = entries.get(0).observability();
+        assertTrue(obs.isPresent(), "ObservabilitySupplement should be present");
+        assertEquals("trace-abc-123", obs.get().correlationId);
     }
 
     // =========================================================================

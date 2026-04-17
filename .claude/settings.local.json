@@ -142,7 +142,15 @@
       "Bash(grep -v \"^\\\\[ERROR\\\\] $\\\\|Failed to execute\")",
       "Bash(find . -name '*.java' -exec sed -i '' 's/IllegalArgumentException \\\\\\([a-z][a-zA-Z]*\\\\\\) = assertThrows\\(ToolCallException/ToolCallException \\\\1 = assertThrows\\(ToolCallException/g; *)",
       "Bash(grep -v \"^\\\\[ERROR\\\\] $\\\\|Failed to execute\\\\|COMPILATION\")",
-      "Bash(JAVA_HOME=$\\(/usr/libexec/java_home -v 26\\) mvn test -pl runtime -Dno-format -Dtest=\"A2ASendMessageTest\")"
+      "Bash(JAVA_HOME=$\\(/usr/libexec/java_home -v 26\\) mvn test -pl runtime -Dno-format -Dtest=\"A2ASendMessageTest\")",
+      "Bash(grep -E \"Tests run.*in $|BUILD\")",
+      "Bash(JAVA_HOME=$\\(/usr/libexec/java_home -v 26\\) mvn test -Dno-format -Dtest=\"SmokeTest\")",
+      "Bash(grep -v \"^\\\\[INFO\\\\]\\\\|^\\\\[ERROR\\\\] Tests\\\\|^\\\\[ERROR\\\\] Failed\\\\|^\\\\[ERROR\\\\] Please\\\\|^\\\\[ERROR\\\\] $\")",
+      "Bash(grep -E \"Tests run.*in $|qhorus|ledger|features|BUILD\")",
+      "Bash(JAVA_HOME=$\\(/usr/libexec/java_home -v 26\\) mvn compile -pl runtime -Dno-format)",
+      "Bash(find *)",
+      "Bash(grep -v \"^\\\\[ERROR\\\\] $\\\\|Failed to execute\\\\|Help\\\\|resume\")",
+      "Bash(grep -v \"^\\\\[ERROR\\\\] $\\\\|Failed\\\\|Help\\\\|resume\\\\|COMPILATION\")"
     ]
   }
 }
