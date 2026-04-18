@@ -1567,8 +1567,8 @@ public class QhorusMcpTools {
         m.put("agent_id", e.actorId);
         m.put("occurred_at", e.occurredAt != null ? e.occurredAt.toString() : null);
         m.put("message_id", e.messageId);
-        // correlationId now in ObservabilitySupplement — read from supplementJson for efficiency
-        m.put("correlation_id", e.observability().map(obs -> obs.correlationId).orElse(null));
+        // correlationId is now a direct field on LedgerEntry (ObservabilitySupplement removed from quarkus-ledger)
+        m.put("correlation_id", e.correlationId);
         m.put("context_refs", e.contextRefs);
         m.put("source_entity", e.sourceEntity);
         m.put("digest", e.digest);

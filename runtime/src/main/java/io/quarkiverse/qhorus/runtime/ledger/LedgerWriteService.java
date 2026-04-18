@@ -15,7 +15,6 @@ import io.quarkiverse.ledger.runtime.config.LedgerConfig;
 import io.quarkiverse.ledger.runtime.model.ActorType;
 import io.quarkiverse.ledger.runtime.model.LedgerEntry;
 import io.quarkiverse.ledger.runtime.model.LedgerEntryType;
-import io.quarkiverse.ledger.runtime.model.supplement.ObservabilitySupplement;
 import io.quarkiverse.ledger.runtime.service.LedgerHashChain;
 import io.quarkiverse.qhorus.runtime.channel.Channel;
 import io.quarkiverse.qhorus.runtime.message.Message;
@@ -145,11 +144,9 @@ public class LedgerWriteService {
         entry.occurredAt = message.createdAt.truncatedTo(ChronoUnit.MILLIS);
         entry.sequenceNumber = sequenceNumber;
 
-        // correlationId moved to ObservabilitySupplement in quarkus-ledger supplement refactoring
+        // correlationId is now a direct field on LedgerEntry (quarkus-ledger removed ObservabilitySupplement)
         if (message.correlationId != null) {
-            final ObservabilitySupplement obs = new ObservabilitySupplement();
-            obs.correlationId = message.correlationId;
-            entry.attach(obs);
+            entry.correlationId = message.correlationId;
         }
 
         // Hash chain
