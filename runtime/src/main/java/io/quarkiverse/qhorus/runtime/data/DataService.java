@@ -5,10 +5,17 @@ import java.util.Optional;
 import java.util.UUID;
 
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
+
+import io.quarkiverse.qhorus.runtime.store.DataStore;
+import io.quarkiverse.qhorus.runtime.store.query.DataQuery;
 
 @ApplicationScoped
 public class DataService {
+
+    @Inject
+    DataStore dataStore;
 
     /**
      * Store or update a shared data artefact.
@@ -23,7 +30,7 @@ public class DataService {
     @Transactional
     public SharedData store(String key, String description, String createdBy,
             String content, boolean append, boolean lastChunk) {
-        SharedData data = SharedData.<SharedData> find("key", key).firstResult();
+        SharedData data = dataStore.findByKey(key).orElse(null);
 
         if (data == null || !append) {
             if (data == null) {
@@ -42,20 +49,20 @@ public class DataService {
 
         data.complete = lastChunk;
         data.sizeBytes = data.content != null ? data.content.length() : 0;
-        data.persist();
+        dataStore.put(data);
         return data;
     }
 
     public Optional<SharedData> getByKey(String key) {
-        return SharedData.find("key", key).firstResultOptional();
+        return dataStore.findByKey(key);
     }
 
     public Optional<SharedData> getByUuid(UUID id) {
-        return SharedData.findByIdOptional(id);
+        return dataStore.find(id);
     }
 
     public List<SharedData> listAll() {
-        return SharedData.listAll();
+        return dataStore.scan(DataQuery.all());
     }
 
     @Transactional
@@ -65,24 +72,22 @@ public class DataService {
             ArtefactClaim claim = new ArtefactClaim();
             claim.artefactId = artefactId;
             claim.instanceId = instanceId;
-            claim.persist();
+            dataStore.putClaim(claim);
         }
     }
 
     @Transactional
     public void release(UUID artefactId, UUID instanceId) {
-        ArtefactClaim.delete("artefactId = ?1 AND instanceId = ?2", artefactId, instanceId);
+        dataStore.deleteClaim(artefactId, instanceId);
     }
 
     /**
      * An artefact is GC-eligible when it is complete AND has no active claims.
      */
     public boolean isGcEligible(UUID artefactId) {
-        SharedData data = SharedData.findById(artefactId);
-        if (data == null || !data.complete) {
-            return false;
-        }
-        long claimCount = ArtefactClaim.count("artefactId", artefactId);
-        return claimCount == 0;
+        return dataStore.find(artefactId)
+                .filter(d -> d.complete)
+                .map(d -> dataStore.countClaims(artefactId) == 0)
+                .orElse(false);
     }
 }
