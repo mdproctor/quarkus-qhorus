@@ -16,6 +16,8 @@ import io.quarkiverse.qhorus.runtime.message.Message;
 import io.quarkiverse.qhorus.runtime.message.MessageService;
 import io.quarkiverse.qhorus.runtime.message.MessageType;
 import io.quarkiverse.qhorus.runtime.message.PendingReply;
+import io.quarkiverse.qhorus.runtime.store.WatchdogStore;
+import io.quarkiverse.qhorus.runtime.store.query.WatchdogQuery;
 
 /**
  * Evaluates all registered watchdog conditions and fires alert messages
@@ -41,6 +43,9 @@ public class WatchdogEvaluationService {
     @Inject
     MessageService messageService;
 
+    @Inject
+    WatchdogStore watchdogStore;
+
     /** Evaluate all registered watchdogs and fire alerts for met conditions. */
     @Transactional
     public void evaluateAll() {
@@ -48,7 +53,7 @@ public class WatchdogEvaluationService {
             return;
         }
 
-        List<Watchdog> watchdogs = Watchdog.listAll();
+        List<Watchdog> watchdogs = watchdogStore.scan(WatchdogQuery.all());
         Instant now = Instant.now();
 
         for (Watchdog w : watchdogs) {
