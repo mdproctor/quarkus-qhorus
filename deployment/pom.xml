@@ -79,6 +79,24 @@
       <artifactId>quarkus-hibernate-orm-panache-common-deployment</artifactId>
     </dependency>
 
+    <!-- Hibernate Reactive + Reactive Panache -->
+    <dependency>
+      <groupId>io.quarkus</groupId>
+      <artifactId>quarkus-hibernate-reactive-deployment</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.quarkus</groupId>
+      <artifactId>quarkus-hibernate-reactive-panache-deployment</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.quarkus</groupId>
+      <artifactId>quarkus-hibernate-reactive-panache-common-deployment</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.quarkus</groupId>
+      <artifactId>quarkus-reactive-datasource-deployment</artifactId>
+    </dependency>
+
     <!-- Flyway -->
     <dependency>
       <groupId>io.quarkus</groupId>

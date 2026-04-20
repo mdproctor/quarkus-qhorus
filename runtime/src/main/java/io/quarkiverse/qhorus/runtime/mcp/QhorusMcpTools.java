@@ -1,7 +1,6 @@
 package io.quarkiverse.qhorus.runtime.mcp;
 
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -69,6 +68,9 @@ public class QhorusMcpTools {
 
     @Inject
     LedgerWriteService ledgerWriteService;
+
+    @Inject
+    io.quarkiverse.qhorus.runtime.ledger.AgentMessageLedgerEntryRepository ledgerRepo;
 
     // ---------------------------------------------------------------------------
     // Return-type records — public so tests can reference them
@@ -1493,35 +1495,19 @@ public class QhorusMcpTools {
 
         int effectiveLimit = (limit != null && limit > 0) ? Math.min(limit, 100) : 20;
 
-        // Build dynamic Panache query with positional params
-        StringBuilder queryStr = new StringBuilder("subjectId = ?1");
-        List<Object> params = new ArrayList<>();
-        params.add(ch.id);
-
-        if (afterId != null) {
-            queryStr.append(" AND sequenceNumber > ?").append(params.size() + 1);
-            params.add(afterId.intValue());
-        }
-        if (agentId != null && !agentId.isBlank()) {
-            queryStr.append(" AND actorId = ?").append(params.size() + 1);
-            params.add(agentId);
-        }
+        java.time.Instant sinceInstant = null;
         if (since != null && !since.isBlank()) {
             try {
-                queryStr.append(" AND occurredAt >= ?").append(params.size() + 1);
-                params.add(java.time.Instant.parse(since));
+                sinceInstant = java.time.Instant.parse(since);
             } catch (final java.time.format.DateTimeParseException e) {
                 throw new IllegalArgumentException(
                         "Invalid 'since' timestamp '" + since
                                 + "' — use ISO-8601 format, e.g. 2026-04-15T10:00:00Z");
             }
         }
-        queryStr.append(" ORDER BY sequenceNumber ASC");
 
-        List<AgentMessageLedgerEntry> entries = AgentMessageLedgerEntry
-                .<AgentMessageLedgerEntry> find(queryStr.toString(), params.toArray())
-                .page(0, effectiveLimit)
-                .list();
+        List<AgentMessageLedgerEntry> entries = ledgerRepo.listEventEntries(
+                ch.id, afterId, agentId, sinceInstant, effectiveLimit);
 
         return entries.stream().map(this::toEventMap).toList();
     }

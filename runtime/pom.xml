@@ -38,6 +38,12 @@
       <artifactId>quarkus-hibernate-orm-panache</artifactId>
     </dependency>
 
+    <!-- Persistence: Reactive Panache — for ReactiveLedgerEntryRepository implementation -->
+    <dependency>
+      <groupId>io.quarkus</groupId>
+      <artifactId>quarkus-hibernate-reactive-panache</artifactId>
+    </dependency>
+
     <!-- Schema migrations -->
     <dependency>
       <groupId>io.quarkus</groupId>

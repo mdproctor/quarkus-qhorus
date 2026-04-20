@@ -77,6 +77,6 @@ class AgentMessageLedgerEntryTest {
 
         assertEquals("agent-1", entry.actorId);
         assertEquals(3, entry.sequenceNumber);
-        // correlationId moved to ObservabilitySupplement in ledger supplement refactoring
+        // correlationId is a direct field on LedgerEntry (ObservabilitySupplement was removed)
     }
 }

@@ -35,6 +35,7 @@ Maven multi-module layout following Quarkiverse conventions:
 | Runtime | Java 21 (on Java 26 JVM) | `maven.compiler.release=21` |
 | Framework | Quarkus 3.32.2 | Inherits `quarkiverse-parent:21` |
 | Persistence | Hibernate ORM + Panache (active record) | Panache `PanacheEntityBase`, UUID PKs |
+| Reactive persistence | Hibernate Reactive Panache (optional) | `quarkus-hibernate-reactive-panache`; `@Alternative` reactive SPI beans; activate with a reactive datasource |
 | Schema migrations | Flyway | `V1__initial_schema.sql`; consuming app owns datasource config |
 | MCP transport | `quarkus-mcp-server-http` 1.11.1 | Streamable HTTP (MCP spec 2025-06-18) |
 | JDBC (dev/test) | H2 (optional dep) | PostgreSQL for production |
@@ -97,6 +98,7 @@ All services are `@ApplicationScoped`. Mutating methods are `@Transactional`.
 - `InstanceService.register()` replaces capability tags on every upsert — no stale tags accumulate.
 - `LedgerWriteService.recordEvent` runs in `REQUIRES_NEW` — a ledger write failure logs a warning and is swallowed; the message transaction is unaffected.
 - Services inject `*Store` interfaces — Panache calls are isolated in `Jpa*Store` implementations; alternative backends activate via CDI `@Alternative @Priority(1)`.
+- `AgentMessageLedgerEntryRepository` uses `EntityManager` directly (not Panache entity statics) because `LedgerEntry` is a plain `@Entity` in quarkus-ledger. `ReactiveAgentMessageLedgerEntryRepository` (`@Alternative`) implements `ReactiveLedgerEntryRepository` via `AgentMessageReactivePanacheRepo`; inactive by default — consumers activate via `quarkus.arc.selected-alternatives` alongside a reactive datasource.
 
 ---
 
@@ -264,4 +266,5 @@ it alongside the original exception type.
 - `SmokeTest` exercises the full cross-domain workflow in one boot
 - Semantic test classes (`LastWriteSemanticTest`, `EphemeralSemanticTest`, `CollectSemanticTest`, `BarrierSemanticTest`) verify each enforcement contract in isolation
 - MCP tool test classes mirror tool groups: `InstanceToolTest`, `ChannelToolTest`, `MessagingToolTest`, `SharedDataToolTest`
-- Current test count: 561
+- Current test count: 717 (646 runtime + 67 testing + 4 examples)
+- `quarkus.datasource.reactive=false` set in test `application.properties` — prevents Hibernate Reactive from booting in H2 test contexts (no reactive H2 driver exists)
