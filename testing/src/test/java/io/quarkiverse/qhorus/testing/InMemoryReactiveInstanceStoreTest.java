@@ -1,77 +1,94 @@
 package io.quarkiverse.qhorus.testing;
 
-import static org.assertj.core.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.*;
 
+import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import io.quarkiverse.qhorus.runtime.instance.Instance;
 import io.quarkiverse.qhorus.runtime.store.query.InstanceQuery;
+import io.quarkiverse.qhorus.testing.contract.InstanceStoreContractTest;
 
-class InMemoryReactiveInstanceStoreTest {
-
+class InMemoryReactiveInstanceStoreTest extends InstanceStoreContractTest {
     private final InMemoryReactiveInstanceStore store = new InMemoryReactiveInstanceStore();
 
-    @BeforeEach
-    void reset() {
+    @Override
+    protected Instance put(Instance i) {
+        return store.put(i).await().indefinitely();
+    }
+
+    @Override
+    protected Optional<Instance> find(UUID id) {
+        return store.find(id).await().indefinitely();
+    }
+
+    @Override
+    protected Optional<Instance> findByInstanceId(String instanceId) {
+        return store.findByInstanceId(instanceId).await().indefinitely();
+    }
+
+    @Override
+    protected List<Instance> scan(InstanceQuery q) {
+        return store.scan(q).await().indefinitely();
+    }
+
+    @Override
+    protected void reset() {
         store.clear();
     }
 
     @Test
-    void put_assignsIdAndReturns() {
-        Instance inst = instance("agent-" + UUID.randomUUID());
-        Instance saved = store.put(inst).await().indefinitely();
-        assertThat(saved.id).isNotNull();
-    }
-
-    @Test
-    void findByInstanceId_returnsEmpty_whenNotFound() {
-        assertThat(store.findByInstanceId("missing").await().indefinitely()).isEmpty();
-    }
-
-    @Test
-    void putCapabilities_andFindCapabilities() {
-        Instance inst = instance("cap-agent-" + UUID.randomUUID());
-        store.put(inst).await().indefinitely();
-
-        store.putCapabilities(inst.id, List.of("code-review", "planning")).await().indefinitely();
-
-        List<String> caps = store.findCapabilities(inst.id).await().indefinitely();
-        assertThat(caps).containsExactlyInAnyOrder("code-review", "planning");
-    }
-
-    @Test
-    void deleteCapabilities_clearsAll() {
-        Instance inst = instance("dc-agent-" + UUID.randomUUID());
-        store.put(inst).await().indefinitely();
-        store.putCapabilities(inst.id, List.of("a", "b")).await().indefinitely();
-
-        store.deleteCapabilities(inst.id).await().indefinitely();
-
-        assertThat(store.findCapabilities(inst.id).await().indefinitely()).isEmpty();
-    }
-
-    @Test
     void scan_byCapability_returnsMatchingInstances() {
-        Instance a = instance("a-" + UUID.randomUUID());
-        Instance b = instance("b-" + UUID.randomUUID());
-        store.put(a).await().indefinitely();
-        store.put(b).await().indefinitely();
-        store.putCapabilities(a.id, List.of("search")).await().indefinitely();
+        Instance i1 = instance("rx-cap-a-" + UUID.randomUUID());
+        store.put(i1).await().indefinitely();
+        store.putCapabilities(i1.id, List.of("summarize", "translate")).await().indefinitely();
 
-        List<Instance> results = store.scan(InstanceQuery.byCapability("search")).await().indefinitely();
+        Instance i2 = instance("rx-cap-b-" + UUID.randomUUID());
+        store.put(i2).await().indefinitely();
+        store.putCapabilities(i2.id, List.of("translate")).await().indefinitely();
 
-        assertThat(results).hasSize(1);
-        assertThat(results.get(0).instanceId).isEqualTo(a.instanceId);
+        List<Instance> results = store.scan(InstanceQuery.byCapability("summarize")).await().indefinitely();
+        assertEquals(1, results.size());
+        assertEquals(i1.instanceId, results.get(0).instanceId);
     }
 
-    private Instance instance(String instanceId) {
-        Instance i = new Instance();
-        i.instanceId = instanceId;
-        i.status = "online";
-        return i;
+    @Test
+    void scan_staleOlderThan_returnsOnlyStale() {
+        Instance fresh = instance("rx-fresh-" + UUID.randomUUID());
+        fresh.lastSeen = Instant.now();
+        store.put(fresh).await().indefinitely();
+
+        Instance stale = instance("rx-stale-" + UUID.randomUUID());
+        stale.lastSeen = Instant.now().minusSeconds(3600);
+        store.put(stale).await().indefinitely();
+
+        Instant threshold = Instant.now().minusSeconds(1800);
+        List<Instance> results = store.scan(InstanceQuery.staleOlderThan(threshold)).await().indefinitely();
+        assertEquals(1, results.size());
+        assertEquals(stale.instanceId, results.get(0).instanceId);
+    }
+
+    @Test
+    void putCapabilities_replacesExistingList() {
+        Instance i = instance("rx-cap-replace-" + UUID.randomUUID());
+        store.put(i).await().indefinitely();
+
+        store.putCapabilities(i.id, List.of("a", "b")).await().indefinitely();
+        store.putCapabilities(i.id, List.of("c")).await().indefinitely();
+
+        assertEquals(List.of("c"), store.findCapabilities(i.id).await().indefinitely());
+    }
+
+    @Test
+    void deleteCapabilities_removesAll() {
+        Instance i = instance("rx-cap-del-" + UUID.randomUUID());
+        store.put(i).await().indefinitely();
+        store.putCapabilities(i.id, List.of("a", "b")).await().indefinitely();
+        store.deleteCapabilities(i.id).await().indefinitely();
+        assertTrue(store.findCapabilities(i.id).await().indefinitely().isEmpty());
     }
 }

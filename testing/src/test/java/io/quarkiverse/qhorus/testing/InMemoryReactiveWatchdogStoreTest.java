@@ -1,63 +1,65 @@
 package io.quarkiverse.qhorus.testing;
 
-import static org.assertj.core.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import io.quarkiverse.qhorus.runtime.store.query.WatchdogQuery;
 import io.quarkiverse.qhorus.runtime.watchdog.Watchdog;
+import io.quarkiverse.qhorus.testing.contract.WatchdogStoreContractTest;
 
-class InMemoryReactiveWatchdogStoreTest {
-
+class InMemoryReactiveWatchdogStoreTest extends WatchdogStoreContractTest {
     private final InMemoryReactiveWatchdogStore store = new InMemoryReactiveWatchdogStore();
 
-    @BeforeEach
-    void reset() {
+    @Override
+    protected Watchdog put(Watchdog w) {
+        return store.put(w).await().indefinitely();
+    }
+
+    @Override
+    protected Optional<Watchdog> find(UUID id) {
+        return store.find(id).await().indefinitely();
+    }
+
+    @Override
+    protected List<Watchdog> scan(WatchdogQuery q) {
+        return store.scan(q).await().indefinitely();
+    }
+
+    @Override
+    protected void delete(UUID id) {
+        store.delete(id).await().indefinitely();
+    }
+
+    @Override
+    protected void reset() {
         store.clear();
     }
 
     @Test
-    void put_assignsIdAndReturns() {
-        Watchdog w = watchdog("threshold");
-        Watchdog saved = store.put(w).await().indefinitely();
-        assertThat(saved.id).isNotNull();
+    void scan_byConditionType_returnsOnlyMatching() {
+        store.put(watchdog("BARRIER_STUCK", "alerts")).await().indefinitely();
+        store.put(watchdog("BARRIER_STUCK", "alerts")).await().indefinitely();
+        store.put(watchdog("AGENT_STALE", "ops")).await().indefinitely();
+
+        List<Watchdog> results = store.scan(WatchdogQuery.byConditionType("BARRIER_STUCK")).await().indefinitely();
+        assertEquals(2, results.size());
+        assertTrue(results.stream().allMatch(w -> "BARRIER_STUCK".equals(w.conditionType)));
     }
 
     @Test
-    void find_returnsEmpty_whenNotFound() {
-        assertThat(store.find(UUID.randomUUID()).await().indefinitely()).isEmpty();
-    }
-
-    @Test
-    void scan_byConditionType_returnsMatching() {
-        store.put(watchdog("threshold")).await().indefinitely();
-        store.put(watchdog("pattern")).await().indefinitely();
-
-        List<Watchdog> results = store.scan(WatchdogQuery.byConditionType("threshold")).await().indefinitely();
-
-        assertThat(results).hasSize(1);
-        assertThat(results.get(0).conditionType).isEqualTo("threshold");
-    }
-
-    @Test
-    void delete_removesWatchdog() {
-        Watchdog w = watchdog("del-type");
+    void put_updatesExistingEntry_whenSameId() {
+        Watchdog w = watchdog("BARRIER_STUCK", "alerts");
         store.put(w).await().indefinitely();
 
-        store.delete(w.id).await().indefinitely();
+        w.notificationChannel = "updated-alerts";
+        store.put(w).await().indefinitely();
 
-        assertThat(store.find(w.id).await().indefinitely()).isEmpty();
-    }
-
-    private Watchdog watchdog(String conditionType) {
-        Watchdog w = new Watchdog();
-        w.conditionType = conditionType;
-        w.targetName = "test-target";
-        w.notificationChannel = "test-alerts";
-        return w;
+        assertEquals("updated-alerts", store.find(w.id).await().indefinitely().get().notificationChannel);
+        assertEquals(1, store.scan(WatchdogQuery.all()).await().indefinitely().size());
     }
 }
