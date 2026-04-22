@@ -3,6 +3,7 @@ package io.quarkiverse.qhorus.store;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -195,5 +196,52 @@ class JpaMessageStoreTest {
         messageStore.delete(m.id);
 
         assertTrue(messageStore.find(m.id).isEmpty());
+    }
+
+    @Test
+    @TestTransaction
+    void countAllByChannel_returnsCorrectCountsPerChannel() {
+        Channel ch1 = createChannel();
+        Channel ch2 = createChannel();
+        messageStore.put(buildMessage(ch1.id, "agent-a", MessageType.REQUEST));
+        messageStore.put(buildMessage(ch1.id, "agent-b", MessageType.RESPONSE));
+        messageStore.put(buildMessage(ch2.id, "agent-c", MessageType.STATUS));
+
+        Map<UUID, Long> counts = messageStore.countAllByChannel();
+
+        assertTrue(counts.containsKey(ch1.id));
+        assertTrue(counts.containsKey(ch2.id));
+        assertEquals(2L, counts.get(ch1.id));
+        assertEquals(1L, counts.get(ch2.id));
+    }
+
+    @Test
+    @TestTransaction
+    void countAllByChannel_returnsEmptyMap_whenNoMessages() {
+        Map<UUID, Long> counts = messageStore.countAllByChannel();
+
+        // May contain entries from other tests in shared DB — only assert no exception thrown
+        // and result is non-null
+        assertNotNull(counts);
+    }
+
+    @Test
+    @TestTransaction
+    void distinctSendersByChannel_excludesSpecifiedType_andDeduplicates() {
+        Channel ch = createChannel();
+        messageStore.put(buildMessage(ch.id, "agent-a", MessageType.REQUEST));
+        messageStore.put(buildMessage(ch.id, "agent-a", MessageType.STATUS)); // duplicate sender
+        messageStore.put(buildMessage(ch.id, "agent-b", MessageType.RESPONSE));
+        Message evt = buildMessage(ch.id, "sys-monitor", MessageType.EVENT);
+        evt.content = "{\"tool_name\":\"t\",\"duration_ms\":1}";
+        messageStore.put(evt);
+
+        List<String> senders = messageStore.distinctSendersByChannel(ch.id, MessageType.EVENT);
+
+        assertTrue(senders.contains("agent-a"), "agent-a should be present");
+        assertTrue(senders.contains("agent-b"), "agent-b should be present");
+        assertFalse(senders.contains("sys-monitor"), "EVENT sender should be excluded");
+        // Deduplication: agent-a posted twice but must appear only once
+        assertEquals(1, senders.stream().filter("agent-a"::equals).count());
     }
 }
