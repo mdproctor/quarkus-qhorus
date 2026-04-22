@@ -104,12 +104,12 @@ public class JpaMessageStore implements MessageStore {
     @Override
     public List<String> distinctSendersByChannel(UUID channelId, MessageType excludedType) {
         @SuppressWarnings("unchecked")
-        List<String> senders = Message.getEntityManager()
+        List<String> result = Message.getEntityManager()
                 .createQuery("SELECT DISTINCT m.sender FROM Message m "
-                        + "WHERE m.channelId = ?1 AND m.messageType != ?2")
+                        + "WHERE m.channelId = ?1 AND m.messageType != ?2 ORDER BY m.sender")
                 .setParameter(1, channelId)
                 .setParameter(2, excludedType)
                 .getResultList();
-        return senders;
+        return result;
     }
 }

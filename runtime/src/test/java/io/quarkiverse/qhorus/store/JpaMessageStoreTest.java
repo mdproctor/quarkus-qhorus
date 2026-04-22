@@ -217,12 +217,14 @@ class JpaMessageStoreTest {
 
     @Test
     @TestTransaction
-    void countAllByChannel_returnsEmptyMap_whenNoMessages() {
+    void countAllByChannel_doesNotContainChannelWithNoMessages() {
+        // Create a channel but persist no messages for it — it must not appear in the count map
+        Channel isolatedChannel = createChannel();
+
         Map<UUID, Long> counts = messageStore.countAllByChannel();
 
-        // May contain entries from other tests in shared DB — only assert no exception thrown
-        // and result is non-null
-        assertNotNull(counts);
+        assertFalse(counts.containsKey(isolatedChannel.id),
+                "Channel with no messages must not appear in countAllByChannel result");
     }
 
     @Test
