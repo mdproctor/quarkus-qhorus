@@ -2,6 +2,7 @@
 
 | File | Date | Title |
 |------|------|-------|
+| [2026-04-22-mdp01-named-datasource-rogue-agent.md](2026-04-22-mdp01-named-datasource-rogue-agent.md) | 2026-04-22 | Named datasource migration — ledger inheritance constraint, library-bean dual-PU, TestProfile trap, PendingReplyStore added by a rogue agent |
 | [2026-04-21-mdp01-reactive-dual-stack-ships.md](2026-04-21-mdp01-reactive-dual-stack-ships.md) | 2026-04-21 | Reactive dual-stack complete — base class extraction, Category A/B tools, build-time activation, contract test trap |
 | [2026-04-13-mdp01-day-zero-designing-mesh.md](2026-04-13-mdp01-day-zero-designing-mesh.md) | 2026-04-13 | Day Zero: vision, research (A2A/AutoGen/LangGraph/Swarm/Letta/CrewAI), design spec, scaffold |
 | [2026-04-14-mdp03-phases-1-5-foundation.md](2026-04-14-mdp03-phases-1-5-foundation.md) | 2026-04-14 | Phases 1–5: core model, 14 MCP tools, channel semantics, wait_for_reply, artefacts; 0→193 tests |
