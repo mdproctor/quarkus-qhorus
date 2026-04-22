@@ -19,7 +19,7 @@ public class JpaPendingReplyStore implements PendingReplyStore {
         if (pr.id == null) {
             pr.persist();
         } else {
-            PendingReply.getEntityManager().merge(pr);
+            pr = PendingReply.getEntityManager().merge(pr);
         }
         return pr;
     }

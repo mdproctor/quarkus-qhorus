@@ -54,6 +54,21 @@ class InMemoryReactivePendingReplyStoreTest {
     }
 
     @Test
+    void save_updatesExistingEntry() {
+        PendingReply pr = pendingReply("corr-upd", Instant.now().plusSeconds(60));
+        store.save(pr).await().indefinitely();
+        Instant newExpiry = Instant.now().plusSeconds(120);
+        pr.expiresAt = newExpiry;
+        store.save(pr).await().indefinitely();
+        assertEquals(newExpiry, store.findByCorrelationId("corr-upd").await().indefinitely().get().expiresAt);
+    }
+
+    @Test
+    void deleteByCorrelationId_nonexistent_noError() {
+        assertDoesNotThrow(() -> store.deleteByCorrelationId("ghost").await().indefinitely());
+    }
+
+    @Test
     void deleteByCorrelationId_removesEntry() {
         store.save(pendingReply("corr-4", Instant.now().plusSeconds(60))).await().indefinitely();
         store.deleteByCorrelationId("corr-4").await().indefinitely();

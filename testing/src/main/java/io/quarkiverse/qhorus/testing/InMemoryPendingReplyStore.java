@@ -1,11 +1,11 @@
 package io.quarkiverse.qhorus.testing;
 
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -19,7 +19,7 @@ import io.quarkiverse.qhorus.runtime.store.PendingReplyStore;
 @ApplicationScoped
 public class InMemoryPendingReplyStore implements PendingReplyStore {
 
-    private final Map<String, PendingReply> store = new ConcurrentHashMap<>();
+    private final Map<String, PendingReply> store = new LinkedHashMap<>();
 
     @Override
     public PendingReply save(PendingReply pr) {

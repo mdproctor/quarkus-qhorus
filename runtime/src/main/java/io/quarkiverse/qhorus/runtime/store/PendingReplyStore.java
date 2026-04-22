@@ -8,7 +8,7 @@ import io.quarkiverse.qhorus.runtime.message.PendingReply;
 
 public interface PendingReplyStore {
 
-    /** Persist a new PendingReply or update an existing one (matched by id). */
+    /** Persist a new PendingReply or update an existing one (matched by correlationId — the business key). */
     PendingReply save(PendingReply pr);
 
     Optional<PendingReply> findByCorrelationId(String correlationId);

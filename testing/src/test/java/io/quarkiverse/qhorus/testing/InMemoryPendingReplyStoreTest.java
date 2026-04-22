@@ -5,87 +5,49 @@ import static org.junit.jupiter.api.Assertions.*;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import io.quarkiverse.qhorus.runtime.message.PendingReply;
+import io.quarkiverse.qhorus.testing.contract.PendingReplyStoreContractTest;
 
-class InMemoryPendingReplyStoreTest {
+class InMemoryPendingReplyStoreTest extends PendingReplyStoreContractTest {
 
-    private InMemoryPendingReplyStore store;
+    private final InMemoryPendingReplyStore store = new InMemoryPendingReplyStore();
 
-    @BeforeEach
-    void setUp() {
-        store = new InMemoryPendingReplyStore();
+    @Override
+    protected PendingReply save(PendingReply pr) {
+        return store.save(pr);
+    }
+
+    @Override
+    protected Optional<PendingReply> findByCorrelationId(String correlationId) {
+        return store.findByCorrelationId(correlationId);
+    }
+
+    @Override
+    protected void deleteByCorrelationId(String correlationId) {
+        store.deleteByCorrelationId(correlationId);
+    }
+
+    @Override
+    protected boolean existsByCorrelationId(String correlationId) {
+        return store.existsByCorrelationId(correlationId);
+    }
+
+    @Override
+    protected List<PendingReply> findExpiredBefore(Instant cutoff) {
+        return store.findExpiredBefore(cutoff);
+    }
+
+    @Override
+    protected void deleteExpiredBefore(Instant cutoff) {
+        store.deleteExpiredBefore(cutoff);
+    }
+
+    @Override
+    protected void reset() {
         store.clear();
-    }
-
-    @Test
-    void saveAndFind_happyPath() {
-        PendingReply pr = pendingReply("corr-1", Instant.now().plusSeconds(60));
-        store.save(pr);
-        Optional<PendingReply> found = store.findByCorrelationId("corr-1");
-        assertTrue(found.isPresent());
-        assertEquals("corr-1", found.get().correlationId);
-    }
-
-    @Test
-    void save_assignsIdIfAbsent() {
-        PendingReply pr = pendingReply("corr-2", Instant.now().plusSeconds(60));
-        assertNull(pr.id);
-        store.save(pr);
-        assertNotNull(pr.id);
-    }
-
-    @Test
-    void findByCorrelationId_notFound_returnsEmpty() {
-        assertTrue(store.findByCorrelationId("nonexistent").isEmpty());
-    }
-
-    @Test
-    void save_updatesExistingEntry() {
-        PendingReply pr = pendingReply("corr-3", Instant.now().plusSeconds(60));
-        store.save(pr);
-        Instant newExpiry = Instant.now().plusSeconds(120);
-        pr.expiresAt = newExpiry;
-        store.save(pr);
-        assertEquals(newExpiry, store.findByCorrelationId("corr-3").get().expiresAt);
-    }
-
-    @Test
-    void deleteByCorrelationId_removesEntry() {
-        store.save(pendingReply("corr-4", Instant.now().plusSeconds(60)));
-        store.deleteByCorrelationId("corr-4");
-        assertTrue(store.findByCorrelationId("corr-4").isEmpty());
-    }
-
-    @Test
-    void deleteByCorrelationId_nonexistent_noError() {
-        assertDoesNotThrow(() -> store.deleteByCorrelationId("ghost"));
-    }
-
-    @Test
-    void existsByCorrelationId_trueWhenPresent() {
-        store.save(pendingReply("corr-5", Instant.now().plusSeconds(60)));
-        assertTrue(store.existsByCorrelationId("corr-5"));
-    }
-
-    @Test
-    void existsByCorrelationId_falseWhenAbsent() {
-        assertFalse(store.existsByCorrelationId("missing"));
-    }
-
-    @Test
-    void findExpiredBefore_returnsOnlyExpired() {
-        Instant now = Instant.now();
-        store.save(pendingReply("expired-1", now.minusSeconds(1)));
-        store.save(pendingReply("expired-2", now.minusSeconds(10)));
-        store.save(pendingReply("active-1", now.plusSeconds(60)));
-        List<PendingReply> expired = store.findExpiredBefore(now);
-        assertEquals(2, expired.size());
-        assertTrue(expired.stream().allMatch(pr -> pr.expiresAt.isBefore(now)));
     }
 
     @Test
@@ -95,21 +57,13 @@ class InMemoryPendingReplyStoreTest {
     }
 
     @Test
-    void deleteExpiredBefore_removesExpiredLeavesActive() {
+    void findExpiredBefore_multipleExpired_returnsAll() {
         Instant now = Instant.now();
-        store.save(pendingReply("expired", now.minusSeconds(5)));
-        store.save(pendingReply("active", now.plusSeconds(60)));
-        store.deleteExpiredBefore(now);
-        assertFalse(store.existsByCorrelationId("expired"));
-        assertTrue(store.existsByCorrelationId("active"));
-    }
-
-    private PendingReply pendingReply(String correlationId, Instant expiresAt) {
-        PendingReply pr = new PendingReply();
-        pr.correlationId = correlationId;
-        pr.channelId = UUID.randomUUID();
-        pr.instanceId = UUID.randomUUID();
-        pr.expiresAt = expiresAt;
-        return pr;
+        store.save(pendingReply("expired-1", now.minusSeconds(1)));
+        store.save(pendingReply("expired-2", now.minusSeconds(10)));
+        store.save(pendingReply("active-1", now.plusSeconds(60)));
+        List<PendingReply> expired = store.findExpiredBefore(now);
+        assertEquals(2, expired.size());
+        assertTrue(expired.stream().allMatch(pr -> pr.expiresAt.isBefore(now)));
     }
 }
