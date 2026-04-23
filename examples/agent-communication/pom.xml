@@ -29,6 +29,10 @@
     <dependency>
       <groupId>io.quarkiverse.langchain4j</groupId>
       <artifactId>quarkus-langchain4j-jlama</artifactId>
+      <!-- KNOWN ISSUE: Quarkus 3.32.2 bootstrap JSON serializer fails with
+           "Unsupported value type: [ALL-UNNAMED]" when Jlama adds Vector API
+           --add-opens args. This is a Quarkus bug (GE-20260423-878486).
+           Track: https://github.com/quarkiverse/quarkus-langchain4j/issues -->
       <version>0.26.1</version>
     </dependency>
     <!-- Switch to Ollama: comment out jlama above, uncomment below.

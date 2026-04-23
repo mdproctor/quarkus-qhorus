@@ -9,7 +9,7 @@ shows a concrete enterprise failure mode and how typed messages prevent it.
 
 ```bash
 # From the quarkus-qhorus root directory
-JAVA_HOME=$(/usr/libexec/java_home -v 26) mvn test -pl examples/agent-communication -Pwith-examples -Dno-format
+JAVA_HOME=$(/usr/libexec/java_home -v 26) mvn test -pl examples/agent-communication -Dno-format
 ```
 
 **First run:** downloads ~700MB (`Llama-3.2-1B-Instruct` model) from HuggingFace
@@ -19,6 +19,12 @@ and caches in `~/.jlama/`. Subsequent runs use the cache — no network required
 
 The inference engine is [Jlama](https://github.com/tjake/Jlama) — pure Java, uses
 the Vector API for SIMD acceleration. No native code.
+
+> **Known issue (Quarkus 3.32.2):** The tests currently fail at bootstrap with
+> `Unsupported value type: [ALL-UNNAMED]` — a bug in Quarkus 3.32.2's bootstrap
+> JSON serializer when handling JVM module opens args added by the Jlama extension.
+> Tracked in garden entry GE-20260423-878486. To run examples now, use the
+> [Ollama provider](#switching-providers) instead.
 
 ---
 
