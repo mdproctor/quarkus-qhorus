@@ -1,5 +1,6 @@
 package io.quarkiverse.qhorus.testing;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -25,8 +26,15 @@ public class InMemoryInstanceStore implements InstanceStore {
 
     @Override
     public Instance put(Instance instance) {
+        Instant now = Instant.now();
         if (instance.id == null) {
             instance.id = UUID.randomUUID();
+        }
+        if (instance.registeredAt == null) {
+            instance.registeredAt = now;
+        }
+        if (instance.lastSeen == null) {
+            instance.lastSeen = now;
         }
         store.put(instance.id, instance);
         return instance;

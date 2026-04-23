@@ -1,5 +1,6 @@
 package io.quarkiverse.qhorus.testing;
 
+import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,6 +31,9 @@ public class InMemoryMessageStore implements MessageStore {
     public Message put(Message message) {
         if (message.id == null) {
             message.id = idCounter.getAndIncrement();
+        }
+        if (message.createdAt == null) {
+            message.createdAt = Instant.now();
         }
         store.put(message.id, message);
         return message;

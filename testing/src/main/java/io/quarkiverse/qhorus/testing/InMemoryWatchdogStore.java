@@ -1,5 +1,6 @@
 package io.quarkiverse.qhorus.testing;
 
+import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,6 +26,9 @@ public class InMemoryWatchdogStore implements WatchdogStore {
     public Watchdog put(Watchdog watchdog) {
         if (watchdog.id == null) {
             watchdog.id = UUID.randomUUID();
+        }
+        if (watchdog.createdAt == null) {
+            watchdog.createdAt = Instant.now();
         }
         store.put(watchdog.id, watchdog);
         return watchdog;

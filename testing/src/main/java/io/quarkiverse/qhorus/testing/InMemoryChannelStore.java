@@ -1,5 +1,6 @@
 package io.quarkiverse.qhorus.testing;
 
+import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,8 +24,15 @@ public class InMemoryChannelStore implements ChannelStore {
 
     @Override
     public Channel put(Channel channel) {
+        Instant now = Instant.now();
         if (channel.id == null) {
             channel.id = UUID.randomUUID();
+        }
+        if (channel.createdAt == null) {
+            channel.createdAt = now;
+        }
+        if (channel.lastActivityAt == null) {
+            channel.lastActivityAt = now;
         }
         store.put(channel.id, channel);
         return channel;

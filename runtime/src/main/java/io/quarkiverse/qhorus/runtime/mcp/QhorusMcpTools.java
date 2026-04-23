@@ -30,6 +30,7 @@ import io.quarkiverse.qhorus.runtime.message.Message;
 import io.quarkiverse.qhorus.runtime.message.MessageService;
 import io.quarkiverse.qhorus.runtime.message.MessageType;
 import io.quarkiverse.qhorus.runtime.store.MessageStore;
+import io.quarkiverse.qhorus.runtime.store.query.MessageQuery;
 import io.quarkus.arc.properties.UnlessBuildProperty;
 
 /**
@@ -1213,20 +1214,8 @@ public class QhorusMcpTools extends QhorusMcpToolsBase {
 
         int effectiveLimit = (limit != null && limit > 0) ? Math.min(limit, 200) : 50;
 
-        List<Message> messages;
-        if (afterId != null) {
-            messages = Message.<Message> find(
-                    "channelId = ?1 AND id > ?2 ORDER BY id ASC",
-                    ch.id, afterId)
-                    .page(0, effectiveLimit)
-                    .list();
-        } else {
-            messages = Message.<Message> find(
-                    "channelId = ?1 ORDER BY id ASC",
-                    ch.id)
-                    .page(0, effectiveLimit)
-                    .list();
-        }
+        List<Message> messages = messageStore.scan(
+                MessageQuery.poll(ch.id, afterId, effectiveLimit));
 
         return messages.stream().map(this::toTimelineEntry).toList();
     }
