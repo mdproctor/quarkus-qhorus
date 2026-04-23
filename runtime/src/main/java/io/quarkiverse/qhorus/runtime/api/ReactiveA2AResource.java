@@ -158,17 +158,18 @@ public class ReactiveA2AResource {
     }
 
     private static String deriveState(List<Message> messages) {
+        MessageType lastType = null;
         for (Message m : messages) {
-            if (m.messageType == MessageType.RESPONSE || m.messageType == MessageType.DONE) {
-                return "completed";
-            }
+            lastType = m.messageType;
         }
-        for (Message m : messages) {
-            if (m.messageType == MessageType.STATUS) {
-                return "working";
-            }
-        }
-        return "submitted";
+        if (lastType == null)
+            return "submitted";
+        return switch (lastType) {
+            case RESPONSE, DONE -> "completed";
+            case FAILURE, DECLINE -> "failed";
+            case STATUS -> "working";
+            default -> "submitted";
+        };
     }
 
     private static Response error400(String message) {
