@@ -22,4 +22,6 @@ jobs:
           cache: maven
 
       - name: Build with Maven
+        # LLM examples (examples/agent-communication) are behind -Pwith-llm-examples.
+        # Default CI build runs the type-system regression tests (no model download required).
         run: mvn -B clean install -Dno-format

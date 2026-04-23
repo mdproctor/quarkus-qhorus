@@ -13,9 +13,22 @@
   <artifactId>quarkus-qhorus-examples</artifactId>
   <packaging>pom</packaging>
   <name>Quarkus Qhorus - Examples</name>
-  <description>Usage examples showing Store injection, in-memory testing, and MCP tool patterns</description>
+  <description>Usage examples showing the Qhorus message taxonomy, store injection, and in-memory testing.</description>
 
+  <!--
+    Default build: type-system module runs in CI (fast, no LLM, no model download).
+    LLM examples: activate with -Pwith-llm-examples (requires model in ~/.jlama/).
+  -->
   <modules>
-    <module>agent-communication</module>
+    <module>type-system</module>
   </modules>
+
+  <profiles>
+    <profile>
+      <id>with-llm-examples</id>
+      <modules>
+        <module>agent-communication</module>
+      </modules>
+    </profile>
+  </profiles>
 </project>

@@ -103,8 +103,8 @@ quarkus-qhorus/
 │       └── QhorusProcessor.java         — @BuildStep: FeatureBuildItem + reactive bean activation
 ├── testing/                             — InMemory*Store + InMemoryReactive*Store (@Alternative @Priority(1)) for consumer unit tests
 ├── examples/
-│   ├── examples/order-processing/       — StoreUsageExample with happy-path tests using in-memory stores
-│   └── examples/agent-communication/    — Real LLM agent examples (Jlama, pure Java); demonstrates 9-type taxonomy with 3 enterprise scenarios + classification accuracy baseline
+│   ├── examples/type-system/            — Fast regression tests for the 9-type taxonomy; runs in CI with no model (MessageTaxonomyTest)
+│   └── examples/agent-communication/    — Real LLM agent examples (Jlama); 3 enterprise scenarios + accuracy baseline; activate with -Pwith-llm-examples
 ├── docs/specs/                          — Design specs
 └── .github/                             — Quarkiverse CI workflows
 ```
@@ -147,7 +147,7 @@ JAVA_HOME=/Library/Java/JavaVirtualMachines/graalvm-25.jdk/Contents/Home \
 - Reactive service tests (`Reactive*ServiceTest`) are all `@Disabled` — reactive services call `Panache.withTransaction()` which needs a native reactive datasource driver. Enable by removing `@Disabled` and adding PostgreSQL Dev Services to `ReactiveTestProfile` when Docker is available.
 - Store contract tests use abstract base classes (`*StoreContractTest` in `testing/src/test/.../contract/`) with two concrete runners each: blocking (`InMemory*StoreTest`) and reactive (`InMemoryReactive*StoreTest`). The reactive runner wraps every factory method with `.await().indefinitely()`. Assertion code is identical across both stacks (inherited from base).
 - When working in a git worktree, always use `mvn -f /absolute/path/to/worktree/pom.xml` — do not rely on `cd` since shell CWD resets between Bash tool calls.
-- `examples/agent-communication` tests require Jlama (`quarkus-langchain4j-jlama`). **Known issue:** Quarkus 3.32.2 bootstrap JSON serializer fails with `Unsupported value type: [ALL-UNNAMED]` when Jlama's extension declares `enable-native-access`. Tests cannot run until fixed upstream in quarkiverse/quarkus-langchain4j — see garden entry GE-20260423-878486 and `~/claude/quarkus-langchain4j/CLAUDE.md` for the fix location.
+- `examples/type-system/` runs in CI (no model, no Jlama). `examples/agent-communication/` is behind `-Pwith-llm-examples` — requires local Jlama fixes installed from `~/claude/quarkus-langchain4j` and model in `~/.jlama/` (~700MB, first run only). See `examples/agent-communication/README.md`.
 
 **Quarkiverse format check:** CI runs `mvn -Dno-format` to skip the enforced Quarkiverse code formatting. Run `mvn` locally to apply formatting (via Quarkiverse parent's formatter plugin).
 
