@@ -54,6 +54,21 @@ public class Message extends PanacheEntityBase {
     @Column(name = "target")
     public String target;
 
+    /** Links to CommitmentStore entry. Auto-set by infrastructure on QUERY/COMMAND. */
+    @Column(name = "commitment_id")
+    public UUID commitmentId;
+
+    /**
+     * When the obligation must be discharged. Null = no temporal constraint (STATUS, RESPONSE, EVENT).
+     * Set from channel config default on QUERY/COMMAND when not provided by sender.
+     */
+    @Column(name = "deadline")
+    public Instant deadline;
+
+    /** When the obligation was explicitly accepted. Null in v1; populated by v2 ACK mechanism. */
+    @Column(name = "acknowledged_at")
+    public Instant acknowledgedAt;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     public Instant createdAt;
 
