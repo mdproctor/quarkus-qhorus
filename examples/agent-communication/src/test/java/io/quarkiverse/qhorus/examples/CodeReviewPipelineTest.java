@@ -1,13 +1,11 @@
 package io.quarkiverse.qhorus.examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.util.UUID;
 
 import jakarta.inject.Inject;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import io.quarkiverse.qhorus.examples.agent.OrchestratorAgent;
@@ -22,8 +20,8 @@ import io.quarkus.test.junit.QuarkusTest;
  * → Orchestrator sends RESPONSE → Worker sends DONE.
  *
  * <p>
- * Requires Docker for Ollama Dev Services (gemma3:1b pulled automatically).
- * Skips gracefully when Docker is unavailable.
+ * Uses Jlama (pure Java inference, no external process). Model downloads
+ * ~700MB from HuggingFace on first run and caches in ~/.jlama/.
  */
 @QuarkusTest
 class CodeReviewPipelineTest {
@@ -33,11 +31,6 @@ class CodeReviewPipelineTest {
 
     @Inject
     WorkerAgent worker;
-
-    @BeforeEach
-    void requireDocker() {
-        assumeTrue(isDockerAvailable(), "Docker not available — skipping Ollama example tests");
-    }
 
     @Test
     void codeReviewPipelineUsesCorrectMessageTypes() {
@@ -74,14 +67,5 @@ class CodeReviewPipelineTest {
 
         assertThat(workerDone.messageType()).isIn("DONE", "STATUS");
         assertThat(workerDone.content()).isNotBlank();
-    }
-
-    private static boolean isDockerAvailable() {
-        try {
-            Process p = new ProcessBuilder("docker", "info").start();
-            return p.waitFor() == 0;
-        } catch (Exception e) {
-            return false;
-        }
     }
 }

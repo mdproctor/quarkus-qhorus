@@ -1,13 +1,11 @@
 package io.quarkiverse.qhorus.examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.util.UUID;
 
 import jakarta.inject.Inject;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import io.quarkiverse.qhorus.examples.agent.WorkerAgent;
@@ -22,18 +20,14 @@ import io.quarkus.test.junit.QuarkusTest;
  * These are categorically distinct — DECLINE requires a reason in content.
  *
  * <p>
- * Requires Docker for Ollama Dev Services. Skips gracefully when unavailable.
+ * Uses Jlama (pure Java inference, no external process). Model downloads
+ * ~700MB from HuggingFace on first run and caches in ~/.jlama/.
  */
 @QuarkusTest
 class OutOfScopeDeclineTest {
 
     @Inject
     WorkerAgent worker;
-
-    @BeforeEach
-    void requireDocker() {
-        assumeTrue(isDockerAvailable(), "Docker not available — skipping Ollama example tests");
-    }
 
     @Test
     void agentDeclinesTaskOutsideCapabilities() {
@@ -64,14 +58,5 @@ class OutOfScopeDeclineTest {
         assertThat(attemptedTask.messageType())
                 .as("A task attempted but not completed should be FAILURE, not DECLINE")
                 .isIn("FAILURE", "STATUS");
-    }
-
-    private static boolean isDockerAvailable() {
-        try {
-            Process p = new ProcessBuilder("docker", "info").start();
-            return p.waitFor() == 0;
-        } catch (Exception e) {
-            return false;
-        }
     }
 }

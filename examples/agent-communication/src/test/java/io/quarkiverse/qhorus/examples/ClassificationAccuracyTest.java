@@ -1,11 +1,9 @@
 package io.quarkiverse.qhorus.examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import jakarta.inject.Inject;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import io.quarkiverse.qhorus.examples.agent.OrchestratorAgent;
@@ -16,15 +14,17 @@ import io.quarkus.test.junit.QuarkusTest;
  * Baseline classification accuracy test.
  *
  * <p>
- * Validates that gemma3:1b correctly classifies Qhorus message types from
- * natural language context. Target: >= 80% accuracy per category.
+ * Validates that Llama-3.2-1B-Instruct (via Jlama) correctly classifies Qhorus
+ * message types from natural language context. Target: >= 80% accuracy per category.
  *
  * <p>
- * Results inform the journal paper evaluation. If accuracy < 80%, change
- * application.properties: quarkus.langchain4j.ollama.devservices.model-name=llama3.2:3b
+ * Results inform the journal paper evaluation: the taxonomy is correctly
+ * granular if LLMs can classify it reliably from context alone.
  *
  * <p>
- * Requires Docker for Ollama Dev Services. Skips gracefully when unavailable.
+ * Uses Jlama (pure Java inference, no external process). Model downloads
+ * ~700MB from HuggingFace on first run and caches in ~/.jlama/.
+ * Switch to a larger model in application.properties if accuracy is insufficient.
  */
 @QuarkusTest
 class ClassificationAccuracyTest {
@@ -34,11 +34,6 @@ class ClassificationAccuracyTest {
 
     @Inject
     WorkerAgent worker;
-
-    @BeforeEach
-    void requireDocker() {
-        assumeTrue(isDockerAvailable(), "Docker not available — skipping Ollama example tests");
-    }
 
     record Scenario(String prompt, String expectedType, String description) {
     }
@@ -95,14 +90,5 @@ class ClassificationAccuracyTest {
         assertThat(accuracy)
                 .as("Classification accuracy for %s should be >= %.0f%%", category, minAccuracy * 100)
                 .isGreaterThanOrEqualTo(minAccuracy);
-    }
-
-    private static boolean isDockerAvailable() {
-        try {
-            Process p = new ProcessBuilder("docker", "info").start();
-            return p.waitFor() == 0;
-        } catch (Exception e) {
-            return false;
-        }
     }
 }

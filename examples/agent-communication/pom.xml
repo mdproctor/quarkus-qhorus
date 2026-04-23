@@ -24,11 +24,29 @@
       <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
+    <!-- Default: pure Java inference — no external process, no Docker, no API key required.
+         Model (~700MB) downloads from HuggingFace on first run and caches in ~/.jlama/ -->
+    <dependency>
+      <groupId>io.quarkiverse.langchain4j</groupId>
+      <artifactId>quarkus-langchain4j-jlama</artifactId>
+      <version>0.26.1</version>
+    </dependency>
+    <!-- Switch to Ollama: comment out jlama above, uncomment below.
+         Requires: ollama serve + ollama pull gemma3:1b
     <dependency>
       <groupId>io.quarkiverse.langchain4j</groupId>
       <artifactId>quarkus-langchain4j-ollama</artifactId>
       <version>0.26.1</version>
     </dependency>
+    -->
+    <!-- Switch to Anthropic: comment out jlama above, uncomment below.
+         Requires: ANTHROPIC_API_KEY env var
+    <dependency>
+      <groupId>io.quarkiverse.langchain4j</groupId>
+      <artifactId>quarkus-langchain4j-anthropic</artifactId>
+      <version>0.26.1</version>
+    </dependency>
+    -->
     <dependency>
       <groupId>io.quarkus</groupId>
       <artifactId>quarkus-junit5</artifactId>
