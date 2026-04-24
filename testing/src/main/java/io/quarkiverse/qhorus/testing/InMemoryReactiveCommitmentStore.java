@@ -8,7 +8,6 @@ import java.util.UUID;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Alternative;
-import jakarta.inject.Inject;
 
 import io.quarkiverse.qhorus.runtime.message.Commitment;
 import io.quarkiverse.qhorus.runtime.message.CommitmentState;
@@ -20,7 +19,6 @@ import io.smallrye.mutiny.Uni;
 @ApplicationScoped
 public class InMemoryReactiveCommitmentStore implements ReactiveCommitmentStore {
 
-    @Inject
     InMemoryCommitmentStore delegate;
 
     @Override
