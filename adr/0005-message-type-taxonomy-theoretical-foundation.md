@@ -97,7 +97,7 @@ Operations: **create**, **cancel** (by debtor), **release** (by creditor),
 **delegate** (transfer to a third party).
 
 A protocol is then a set of commitments and their operations. This framework is
-the semantic foundation for the `CommitmentStore` (v2): a live registry of open,
+the semantic foundation for the `CommitmentStore` — a live registry of open,
 fulfilled, cancelled, and delegated commitments.
 
 The key insight: Layer 1 (normative) and Layer 2 (social commitment) are not
@@ -248,7 +248,7 @@ Singh's school treats social commitments as the primitive, grounding ACL
 semantics in observable social obligations rather than unverifiable mental states.
 Qhorus adopts this framework as Layer 2: each message type's commitment
 operations are formally specified using Singh's `C(debtor, creditor, antecedent,
-consequent)` notation. The `CommitmentStore` (v2) is a direct instantiation of
+consequent)` notation. The `CommitmentStore` is a direct instantiation of
 Singh's commitment machine concept.
 
 ### Governatori's Defeasible Deontic Logic (2004–2024)
@@ -297,7 +297,7 @@ COMMITMENT ENVELOPE (structured, infrastructure-reads, Drools-processable)
   correlationId  — auto-generated for QUERY and COMMAND
   deadline       — when obligation must be discharged (from channel config)
   sender, target, channelId, artefactRefs, inReplyTo
-  acknowledgedAt — when obligation was explicitly accepted (v2)
+  acknowledgedAt — when obligation was explicitly accepted (populated by CommitmentService.acknowledge())
 
 LLM PAYLOAD (free text, opaque to infrastructure)
   content        — natural language message
@@ -338,7 +338,7 @@ These properties map to EU AI Act requirements for high-risk AI systems:
 | Art. 9: Risk management | Policy rules (v3 Drools) approved by humans |
 | Art. 13: Transparency | All acts typed, attributed, ledgered |
 | Art. 14: Human oversight | VETO + HANDOFF-to-human built into the type system |
-| Art. 17: Quality management | CommitmentStore (v2) tracks obligation fulfilment rates |
+| Art. 17: Quality management | CommitmentStore tracks obligation fulfilment rates |
 
 ---
 
@@ -362,7 +362,7 @@ These properties map to EU AI Act requirements for high-risk AI systems:
 - `MessageType` enum has 9 values with formal Javadoc encoding the deontic semantics
 - `Message` entity carries `commitmentId`, `deadline`, `acknowledgedAt` as envelope fields
 - MCP tools validate `requiresContent()` (DECLINE, FAILURE) and `requiresTarget()` (HANDOFF) at call time
-- `CommitmentStore` (v2) will track the full obligation lifecycle using Singh's model
+- `CommitmentStore` tracks the full obligation lifecycle using Singh's model
 - `quarkus-qhorus-rules` (v3) will enforce the defeasibility rules via Drools
 - HITL types (APPROVAL, VETO, REDIRECT) are deferred until the human-in-the-loop design is settled
 - ACK as a first-class type is deferred to v2; `acknowledgedAt` field bridges the gap

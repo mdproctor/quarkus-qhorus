@@ -204,7 +204,7 @@ All tools exposed via the single `/mcp` Streamable HTTP endpoint.
 |---|---|
 | `send_message` | Post to a channel. Type required. `handoff` auto-includes `target` validation. `request` auto-generates `correlation_id` if not supplied. |
 | `check_messages` | Poll for new messages. Supports `after_id`, `limit`, sender filter. Returns messages + last ID for subsequent polling. |
-| `wait_for_reply` | Persistent long-poll with SSE keepalives. Registers a `PendingReply(correlation_id, timeout_ms)` — wakes only on a `response` carrying that ID, OR on any message if no `correlation_id` supplied. Re-entrant safe: uses UUID not positional matching. |
+| `wait_for_reply` | Persistent long-poll with SSE keepalives. Polls Commitment state by `correlation_id` — wakes when state reaches FULFILLED, DECLINED, FAILED, or EXPIRED. Re-entrant safe: uses UUID not positional matching. Transparently follows HANDOFF delegation chains. |
 | `get_replies` | Retrieve all replies to a specific message ID. |
 | `search_messages` | Full-text search across all channels. |
 
@@ -246,13 +246,13 @@ sequenceDiagram
 
     A->>QH: send_message(type:query, correlation_id:"abc-123")
     A->>QH: wait_for_reply(correlation_id:"abc-123", timeout_s:90)
-    Note over QH: Registers PendingReply(id:"abc-123")\nOpens SSE keepalive stream
+    Note over QH: Polls Commitment(correlationId:"abc-123")\nOpens SSE keepalive stream
     QH-->>A: SSE keepalive (every 30s)
     B->>QH: send_message(type:response, correlation_id:"abc-123")
     QH->>A: SSE event: message arrived
     QH->>A: return response message
 
-    Note over QH: PendingReply removed\nArtefact refs in response claimable
+    Note over QH: Commitment→FULFILLED\nArtefact refs in response claimable
 ```
 
 **Key design rules (from LangGraph interrupt model):**
@@ -518,7 +518,7 @@ The original's types all appear in agent context — agents receive routing deci
 
 The original `wait_for_reply` polls for any message newer than `after_id` from any sender that isn't the caller. This works for single-threaded request/response but breaks when an agent has multiple concurrent requests in flight — message N+1 may be a reply to request B, not request A.
 
-UUID correlation IDs decouple reply matching from message ordering. Each `request` carries a `correlation_id`; `wait_for_reply` registers a `PendingReply` row keyed to that UUID and wakes only when a `response` carries the matching ID. Multiple concurrent waits are safe. The approach follows LangGraph's interrupt model, where the resume cursor is a stable key, not a positional offset.
+UUID correlation IDs decouple reply matching from message ordering. Each QUERY or COMMAND carries a `correlation_id`; `wait_for_reply` polls the `Commitment` keyed to that UUID and wakes when the state reaches FULFILLED, DECLINED, FAILED, or EXPIRED. Multiple concurrent waits are safe. The approach follows LangGraph's interrupt model, where the resume cursor is a stable key, not a positional offset.
 
 ### Artefact refs instead of inline payloads
 
@@ -579,7 +579,7 @@ Storing `reply_count` as a denormalized column trades a small write overhead (in
 | **1 — Core** | Data model, ChannelService, MessageService, InstanceService, DataService |
 | **2 — MCP tools** | All tools via `@Tool` annotations on `QhorusMcpTools`, basic APPEND channels only |
 | **3 — Channel semantics** | COLLECT, BARRIER, EPHEMERAL, LAST_WRITE semantics |
-| **4 — Correlation** | `wait_for_reply` with correlation IDs, PendingReply table, SSE keepalives |
+| **4 — Correlation** | `wait_for_reply` with correlation IDs, CommitmentStore lifecycle tracking, SSE keepalives |
 | **5 — Artefacts** | Claim/release lifecycle, chunked streaming, artefact_refs on messages |
 | **6 — Addressing** | Capability tags, tag-based dispatch, role broadcast |
 | **7 — Agent Card** | `/.well-known/agent-card.json`, self-describing skills |
