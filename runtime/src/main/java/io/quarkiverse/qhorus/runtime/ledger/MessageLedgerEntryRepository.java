@@ -79,12 +79,12 @@ public class MessageLedgerEntryRepository implements LedgerEntryRepository {
         params.add(channelId);
 
         if (messageTypes != null && !messageTypes.isEmpty()) {
-            jpql.append(" AND e.messageType IN ?").append(params.size() + 1);
+            jpql.append(" AND e.messageType IN (?").append(params.size() + 1).append(")");
             params.add(messageTypes);
         }
         if (afterSequence != null) {
             jpql.append(" AND e.sequenceNumber > ?").append(params.size() + 1);
-            params.add(afterSequence.intValue());
+            params.add(afterSequence);
         }
         if (agentId != null && !agentId.isBlank()) {
             jpql.append(" AND e.actorId = ?").append(params.size() + 1);
