@@ -1,5 +1,5 @@
 # Quarkus Qhorus — Session Handover
-**Date:** 2026-04-24 (sixteenth session — CommitmentStore ships; PendingReply deleted; 871 tests)
+**Date:** 2026-04-26 (wrap — issue #98 created for classification accuracy; CI fixed for GitHub Packages)
 
 ## What Was Done This Session
 
@@ -18,7 +18,7 @@
 
 ## Immediate Next Steps
 
-1. **Run LLM examples** — `mvn test -pl examples/agent-communication -Pwith-llm-examples -Dno-format` — model is cached in `~/.jlama/` (downloaded end of previous session, exit 0). Get the classification accuracy numbers for the journal paper.
+1. **Classification accuracy baseline (#98)** — tracked as issue. Run: `mvn test -pl examples/agent-communication -Pwith-llm-examples -Dno-format -Dtest=ClassificationAccuracyTest`. Model cached in `~/.jlama/`. Results needed for journal paper.
 2. **Normative ledger entries (v3 prep)** — expand `LedgerWriteService` to record COMMAND, DECLINE, FAILURE, HANDOFF, DONE (not just EVENT). CommitmentStore is now the live view; ledger would be the immutable historical record.
 3. **PR Jlama fixes upstream** — 3 commits in `~/claude/quarkus-langchain4j` to quarkiverse/quarkus-langchain4j. Fixes: devMode jvmOptions, ChatMemoryProcessor @BuildStep, JlamaProcessor @BuildStep.
 4. **Paper** — contact Governatori; ADR-0005 is ready to share; session capture at `~/claude/2026-04-23-speech-acts-deontic-session-capture.md`.
