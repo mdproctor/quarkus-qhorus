@@ -25,8 +25,9 @@ import io.quarkiverse.qhorus.runtime.channel.RateLimiter;
 import io.quarkiverse.qhorus.runtime.instance.Capability;
 import io.quarkiverse.qhorus.runtime.instance.Instance;
 import io.quarkiverse.qhorus.runtime.instance.InstanceService;
-import io.quarkiverse.qhorus.runtime.ledger.AgentMessageLedgerEntry;
 import io.quarkiverse.qhorus.runtime.ledger.LedgerWriteService;
+import io.quarkiverse.qhorus.runtime.ledger.MessageLedgerEntry;
+import io.quarkiverse.qhorus.runtime.ledger.MessageLedgerEntryRepository;
 import io.quarkiverse.qhorus.runtime.message.Commitment;
 import io.quarkiverse.qhorus.runtime.message.CommitmentState;
 import io.quarkiverse.qhorus.runtime.message.Message;
@@ -78,7 +79,7 @@ public class QhorusMcpTools extends QhorusMcpToolsBase {
     LedgerWriteService ledgerWriteService;
 
     @Inject
-    io.quarkiverse.qhorus.runtime.ledger.AgentMessageLedgerEntryRepository ledgerRepo;
+    MessageLedgerEntryRepository ledgerRepo;
 
     @Inject
     MessageStore messageStore;
@@ -564,14 +565,12 @@ public class QhorusMcpTools extends QhorusMcpToolsBase {
             msg.deadline = java.time.Instant.now().plus(java.time.Duration.parse(deadline));
         }
 
-        // Record structured ledger entry for EVENT messages
-        if (msgType == MessageType.EVENT) {
-            try {
-                ledgerWriteService.recordEvent(ch, msg);
-            } catch (Exception e) {
-                LOG.warnf("Ledger write failed for EVENT message %d in channel '%s': %s",
-                        msg.id, ch.name, e.getMessage());
-            }
+        // Record every message as an immutable ledger entry
+        try {
+            ledgerWriteService.record(ch, msg);
+        } catch (Exception e) {
+            LOG.warnf("Ledger write failed for message %d in channel '%s': %s",
+                    msg.id, ch.name, e.getMessage());
         }
 
         // Record rate window entry after successful persist (not on rejected or EVENT messages)
@@ -1264,25 +1263,36 @@ public class QhorusMcpTools extends QhorusMcpToolsBase {
     }
 
     // ---------------------------------------------------------------------------
-    // Ledger event audit trail tools
+    // Ledger audit trail tools
     // ---------------------------------------------------------------------------
 
-    @Tool(name = "list_events", description = "Query the structured event audit trail for a channel. "
-            + "Returns EVENT-type ledger entries in chronological order. "
-            + "Supports optional filters for agent_id, since (ISO-8601 timestamp), and cursor-based "
-            + "pagination via after_id (sequence_number cursor).")
+    @Tool(name = "list_ledger_entries", description = "Query the immutable audit ledger for a channel. "
+            + "Returns all ledger entries in chronological order — every speech act, every tool invocation. "
+            + "Use type_filter to narrow by message type: 'COMMAND,DONE,FAILURE' for obligation lifecycle, "
+            + "'EVENT' for telemetry only, omit for the full channel history. "
+            + "Supports optional filters for agent_id, since (ISO-8601), and cursor-based pagination via after_id.")
     @Transactional
-    public List<Map<String, Object>> listEvents(
+    public List<Map<String, Object>> listLedgerEntries(
             @ToolArg(name = "channel_name", description = "Name of the channel to query") String channelName,
+            @ToolArg(name = "type_filter", description = "Comma-separated MessageType names to include "
+                    + "(e.g. 'COMMAND,DONE,FAILURE'). Omit to return all types.", required = false) String typeFilter,
+            @ToolArg(name = "agent_id", description = "Filter by sender — returns only entries from this agent", required = false) String agentId,
+            @ToolArg(name = "since", description = "ISO-8601 timestamp — return only entries at or after this time", required = false) String since,
             @ToolArg(name = "after_id", description = "Return entries with sequence_number > after_id (cursor pagination)", required = false) Long afterId,
-            @ToolArg(name = "limit", description = "Maximum entries to return (default 20, max 100)", required = false) Integer limit,
-            @ToolArg(name = "agent_id", description = "Filter by agent (actor_id) — returns only entries from this agent", required = false) String agentId,
-            @ToolArg(name = "since", description = "ISO-8601 timestamp — return only entries at or after this time", required = false) String since) {
+            @ToolArg(name = "limit", description = "Maximum entries to return (default 20, max 100)", required = false) Integer limit) {
 
-        Channel ch = channelService.findByName(channelName)
+        final Channel ch = channelService.findByName(channelName)
                 .orElseThrow(() -> new IllegalArgumentException("Channel not found: " + channelName));
 
-        int effectiveLimit = (limit != null && limit > 0) ? Math.min(limit, 100) : 20;
+        java.util.Set<String> types = null;
+        if (typeFilter != null && !typeFilter.isBlank()) {
+            types = java.util.Arrays.stream(typeFilter.split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .collect(java.util.stream.Collectors.toSet());
+        }
+
+        final int effectiveLimit = (limit != null && limit > 0) ? Math.min(limit, 100) : 20;
 
         java.time.Instant sinceInstant = null;
         if (since != null && !since.isBlank()) {
@@ -1290,15 +1300,14 @@ public class QhorusMcpTools extends QhorusMcpToolsBase {
                 sinceInstant = java.time.Instant.parse(since);
             } catch (final java.time.format.DateTimeParseException e) {
                 throw new IllegalArgumentException(
-                        "Invalid 'since' timestamp '" + since
-                                + "' — use ISO-8601 format, e.g. 2026-04-15T10:00:00Z");
+                        "Invalid 'since' timestamp '" + since + "' — use ISO-8601 format, e.g. 2026-04-15T10:00:00Z");
             }
         }
 
-        List<AgentMessageLedgerEntry> entries = ledgerRepo.listEventEntries(
-                ch.id, afterId, agentId, sinceInstant, effectiveLimit);
+        final List<MessageLedgerEntry> entries = ledgerRepo.listEntries(
+                ch.id, types, afterId, agentId, sinceInstant, effectiveLimit);
 
-        return entries.stream().map(this::toEventMap).toList();
+        return entries.stream().map(this::toLedgerEntryMap).toList();
     }
 
     @Tool(name = "get_channel_timeline", description = "Return all messages for a channel in chronological order, "

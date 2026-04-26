@@ -8,7 +8,7 @@ import java.util.function.Supplier;
 
 import io.quarkiverse.qhorus.runtime.channel.Channel;
 import io.quarkiverse.qhorus.runtime.data.SharedData;
-import io.quarkiverse.qhorus.runtime.ledger.AgentMessageLedgerEntry;
+import io.quarkiverse.qhorus.runtime.ledger.MessageLedgerEntry;
 import io.quarkiverse.qhorus.runtime.message.Message;
 import io.quarkiverse.qhorus.runtime.message.MessageType;
 import io.quarkiverse.qhorus.runtime.watchdog.Watchdog;
@@ -371,19 +371,35 @@ public abstract class QhorusMcpToolsBase {
                 w.lastFiredAt != null ? w.lastFiredAt.toString() : null);
     }
 
-    protected Map<String, Object> toEventMap(AgentMessageLedgerEntry e) {
-        Map<String, Object> m = new java.util.LinkedHashMap<>();
-        m.put("tool_name", e.toolName);
-        m.put("duration_ms", e.durationMs);
-        m.put("token_count", e.tokenCount);
-        m.put("agent_id", e.actorId);
+    protected Map<String, Object> toLedgerEntryMap(final MessageLedgerEntry e) {
+        final Map<String, Object> m = new java.util.LinkedHashMap<>();
+        m.put("sequence_number", (long) e.sequenceNumber);
+        m.put("message_type", e.messageType);
+        m.put("entry_type", e.entryType != null ? e.entryType.name() : null);
+        m.put("actor_id", e.actorId);
+        m.put("target", e.target);
+        m.put("content", e.content);
+        m.put("correlation_id", e.correlationId);
+        m.put("commitment_id", e.commitmentId != null ? e.commitmentId.toString() : null);
+        m.put("caused_by_entry_id", e.causedByEntryId != null ? e.causedByEntryId.toString() : null);
         m.put("occurred_at", e.occurredAt != null ? e.occurredAt.toString() : null);
         m.put("message_id", e.messageId);
-        m.put("correlation_id", e.correlationId);
-        m.put("context_refs", e.contextRefs);
-        m.put("source_entity", e.sourceEntity);
-        m.put("digest", e.digest);
-        m.put("sequence_number", (long) e.sequenceNumber);
+        // Telemetry — only include keys when values are present (EVENT-only fields)
+        if (e.toolName != null) {
+            m.put("tool_name", e.toolName);
+        }
+        if (e.durationMs != null) {
+            m.put("duration_ms", e.durationMs);
+        }
+        if (e.tokenCount != null) {
+            m.put("token_count", e.tokenCount);
+        }
+        if (e.contextRefs != null) {
+            m.put("context_refs", e.contextRefs);
+        }
+        if (e.sourceEntity != null) {
+            m.put("source_entity", e.sourceEntity);
+        }
         return m;
     }
 
