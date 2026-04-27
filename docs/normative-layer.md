@@ -117,87 +117,138 @@ What we realised is that **these two traditions are not competing approaches —
 
 ## What This Enables in Practice
 
-In most multi-agent systems today, agents communicate by passing messages. An orchestrator tells a subagent to do something. The subagent either responds or it doesn't. If it doesn't, you grep the logs. If it delegated to a third agent, you might never find out. If it declined with a reason, that reason lived in a string field somewhere. There is no system-level concept of *obligation* — no record that a commitment existed, was accepted, and was discharged or refused.
+The normative layer changes the answers to seven questions that matter in every serious agentic
+deployment. Without it, these questions either have no clean answer, or require hours of
+archaeology across logs that were never designed to capture what was promised. With it, each is
+a query.
 
-This works in demos. It breaks in production. Here is what changes:
+### *"Who approved this decision, and what checks ran first?"* — Compliance audit
 
-### Compliance audit in regulated industries
+The FCA asks: "On 14 April, who approved the £180,000 payout and what checks were run before
+that decision?" Without the normative layer, a developer manually reconstructs this from
+disparate logs across multiple services — a process that takes hours and produces a narrative
+that might be wrong. With the normative layer, a single `get_obligation_chain` call on the
+payments channel returns the complete obligation history: sanctions screening (DONE), fraud
+scoring (DONE, risk 0.12, ENDORSED by compliance officer), compliance check (DECLINED then
+re-approved after HANDOFF to senior adjuster), payment attempt (FAILURE), CHAPS retry (DONE) —
+with timestamps, agent identities, and causal links. The ledger IS the audit trail. It was built
+as the system ran, not assembled afterwards. And the auditor does not need to trust the system's
+reporting: the SHA-256 hash chain is independently verifiable.
 
-The FCA asks: "On 14 April, who approved the £180,000 payout and what checks were run before that decision?" Without the normative layer, a developer manually reconstructs this from disparate logs across multiple services. With the normative layer, a single `get_obligation_chain` call on the payments channel returns the complete obligation history — sanctions screening (DONE), fraud scoring (DONE, risk 0.12), compliance check (DECLINED then re-approved after HANDOFF), payment attempt (FAILURE), retry (DONE) — with timestamps, agent identities, and the causal links between them. The ledger IS the audit trail. It was built as the system ran.
+### *"What goes in the regulatory report, and how do we know it's complete?"* — Regulatory evidence
 
-### Incident investigation
+In regulated industries, filing a Solvency II pre-notification or an FCA disclosure is itself
+a normative act — a COMMAND issued, a confirmation DONE, a reference number recorded. Without
+the normative layer, regulatory reports are generated after the fact by extracting data from
+disparate systems, assembling a narrative, and hoping nothing was missed. With the normative
+layer, `list_ledger_entries` with `type_filter=COMMAND,DONE` on the compliance channel *is*
+the regulatory evidence. Every pre-notification, every post-settlement report, every compliance
+check is already in the ledger — complete, causally linked to the obligation that required it,
+and tamper-evidently sealed. There is no separate reporting system. The process and the proof
+are the same record.
 
-An order processed incorrectly. Which agent decided what, in what order, and why? With raw message passing you hunt through distributed traces. With the normative layer, `get_causal_chain` on the failing ledger entry walks backwards through every HANDOFF and COMMAND in the obligation's history. You see exactly where the chain diverged from expected behaviour.
+### *"Which agent made the decision that caused this, and why?"* — Incident investigation
 
-### SLA monitoring at runtime
+A payment processed incorrectly. A claim was declined that should have been approved. An
+escalation never reached the right agent. Without the normative layer, answering these questions
+means hours of distributed trace correlation across multiple services — and the answer, when it
+arrives, is a reconstruction that cannot be independently verified. With the normative layer,
+`get_causal_chain` on the failing ledger entry walks backwards through every HANDOFF and COMMAND
+in the obligation's history in seconds. You see exactly where the chain diverged: which agent
+held the obligation, what it decided, whether it was attested by a peer, and what happened next.
+The answer is in the ledger, causally linked, and it was put there as the system ran.
 
-Agents issue COMMANDs and don't always get responses. In a conventional system you build bespoke timeout logic per workflow. With the normative layer, `list_stalled_obligations` is a single query — it finds every COMMAND that has no DONE, FAILURE, DECLINE, or HANDOFF, and tells you how long it has been waiting. The Watchdog module can act on this automatically. Stalled obligations surface themselves.
+### *"Which obligations are overdue, and how long have they been waiting?"* — SLA enforcement
 
-### Accountability under delegation
+Agents issue COMMANDs and do not always receive responses. In a conventional system, timeout
+logic is bespoke — written per workflow, hard to standardise, easy to get wrong. With the
+normative layer, `list_stalled_obligations` is a single query that surfaces every COMMAND with
+no DONE, FAILURE, DECLINE, or HANDOFF, with the exact duration since it was issued. The Watchdog
+module acts on this automatically. There is no polling, no timeout counter, no custom monitoring
+code per workflow. Stalled obligations surface themselves because every COMMAND that was issued
+is in the ledger, and any that was not resolved is trivially queryable.
 
-An orchestrator issues a COMMAND. Agent A says "not my domain" and HANDOFFs to Agent B. Agent B fails. Who is responsible? Without formal delegation tracking, this is ambiguous — and in a regulated system, ambiguity is liability. With HANDOFF as a first-class speech act recorded in the ledger, the delegation chain is explicit: Agent A transferred the obligation at timestamp T, Agent B accepted it, Agent B failed it. The causal chain is in the ledger, linked by `causedByEntryId`.
+### *"When a task was delegated and then failed, who is responsible?"* — Accountability under delegation
 
-### Debugging at scale
+An orchestrator issues a COMMAND. Agent A says "not my domain" and HANDOFFs to Agent B. Agent B
+fails. Without formal delegation tracking, responsibility is ambiguous — and in regulated
+environments, ambiguity is not a process problem, it is a compliance failure. GDPR Article 22
+and FCA PS20/1 both require clear attribution of automated decisions. With HANDOFF as a
+first-class speech act recorded in the ledger, attribution is a structural property: Agent A
+transferred the obligation at timestamp T, Agent B accepted it at T+4s, Agent B failed it at
+T+47s with a stated reason. The causal chain is in the ledger, linked by `causedByEntryId`,
+and it was built by the infrastructure — not by a human writing an incident report after the
+fact.
 
-An agent produced the wrong output. What did it do internally? `summarise_telemetry` shows every tool it invoked, how long each took, how many tokens it consumed. `get_agent_history` shows every obligation it was party to, in sequence. You can reconstruct the agent's reasoning trace from the immutable record without instrumenting anything after the fact.
+### *"What did that agent actually do, and should we trust its output?"* — Debugging and observability
 
-### Participant trust and discovery provenance
+An agent produced the wrong output. Without the normative layer, reconstructing what it did
+means correlating distributed traces across services, reading logs that were written for
+operators rather than auditors, and making inferences about what happened from indirect evidence.
+With the normative layer, `get_agent_history` returns every obligation the agent was party to,
+in sequence — every COMMAND it received, every DONE or FAILURE it issued, every DECLINE or
+HANDOFF it made. `summarise_telemetry` shows every tool it invoked, in order, with wall-clock
+duration and token consumption. The complete reasoning trace is in the ledger. It required no
+extra instrumentation. It was built as the system ran.
 
-In most agentic systems, trust is either hardcoded ("this agent is allowed to do X") or absent
-("we assume all agents are trustworthy"). Neither holds in production. The normative layer, backed
-by quarkus-ledger, provides a third option: trust derived from observable behaviour, propagated
-transitively through the mesh, anchored to an immutable record.
+### *"Which agent should handle this task, given everything we know about it?"* — Trust derived from behaviour
+
+The hardest operational question in a large agent mesh is not capability — capability is
+declared. It is trust: of all capable agents, which has earned the right to handle this
+particular task, given its track record and how its peers have rated its decisions?
+
+In most agentic systems, trust is either hardcoded ("this agent is permitted to do X") or
+absent ("we assume all agents are trustworthy"). Neither holds in production. The normative
+layer, backed by quarkus-ledger, provides a third option: trust derived from the immutable
+ledger record of what agents have actually done.
 
 **Attestations** are peer review verdicts stamped onto ledger entries. When an agent reviews
-another agent's decision — a sanctions check, a fraud score, a compliance ruling — it stamps a
-`LedgerAttestation` with a verdict: `SOUND`, `ENDORSED`, `FLAGGED`, or `CHALLENGED`, together
-with evidence text and a confidence score. These are not opinions stored in application state;
-they are immutable records in the same tamper-evident ledger that holds every obligation.
+another's decision — a fraud score, a compliance ruling, a payment authorisation — it stamps a
+`LedgerAttestation`: `SOUND`, `ENDORSED`, `FLAGGED`, or `CHALLENGED`, with evidence text and a
+confidence score. These are not opinions in application state. They are immutable records in the
+same tamper-evident ledger that holds every obligation.
 
-**Bayesian Beta trust scoring** (`ActorTrustScore`) computes a per-actor trust score from
-direct attestation history. Each agent has an alpha value (accumulated positive evidence) and a
-beta value (accumulated negative evidence). As peers endorse or challenge decisions, the
-distribution narrows and the trust score stabilises. An agent that has been reviewed hundreds of
-times and consistently endorsed has a fundamentally different score from one that has never been
-attested or has been challenged. The score is a property of the ledger record, not of any
-individual system's configuration.
+**Bayesian Beta trust scoring** computes a per-actor score from direct attestation history.
+Alpha accumulates positive evidence; beta accumulates negative evidence. As peers endorse or
+challenge decisions, the distribution narrows and the score stabilises. An agent consistently
+endorsed over hundreds of decisions has a fundamentally different score — and a fundamentally
+different operational role — from one that has been challenged or has never been attested at all.
+The score is a property of the ledger record, not of any configuration file.
 
-**EigenTrust** (`EigenTrustComputer`) propagates trust transitively through the mesh via power
-iteration — the same algorithm used in peer-to-peer reputation systems (Kamvar et al., 2003).
-If agent A has attested positively to B's decisions, and B has attested positively to C's, then
-A has a derived signal about C even without direct interaction. The result is a global trust share
-for every actor in the mesh: a single number in [0.0, 1.0] that reflects the actor's standing
-across the entire observed network of peer reviews, not just its direct relationships. New agents
-entering the mesh with no attestation history receive a uniform prior; their score shifts as
-peers observe and attest to their decisions.
+**EigenTrust** propagates trust transitively through the mesh via power iteration (Kamvar et
+al., 2003). If agent A has attested positively to B's decisions, and B has attested positively
+to C's, A has a derived signal about C without ever interacting with it directly. The result is
+a global trust share for every actor — a single number in [0.0, 1.0] reflecting standing across
+the entire observed network of peer reviews, not just direct relationships.
 
-**Discovery provenance** ties this to participant registration. CaseHub has adopted the same
-four-layer framework for worker registration (ADR-0006): a worker's registration is a normative
-act — a speech act that constitutively creates a participant with deontic consequences. The
-engine incurs an obligation to consider the worker for capable work; the worker incurs an
-obligation to accept work within its declared capabilities or decline with reason. The discovery
-lineage of how a worker came to be known — statically declared, provisioned, self-announced, or
-introduced by another participant — is recorded using the same `causedByEntryId` causal chain as
-obligation lineage in Qhorus. Trust derives from this chain: a worker introduced by a
-provisioner whose EigenTrust score is high inherits a correspondingly stronger initial deontic
-standing than one that self-announced without a voucher.
+**Discovery provenance** extends this to how agents came to exist in the mesh. CaseHub applies
+the same framework to worker registration (ADR-0006): a worker's registration is a normative
+act, recorded in the ledger with the same `causedByEntryId` causal chain as obligation lineage.
+A worker introduced by a high-trust provisioner inherits a stronger initial deontic standing via
+EigenTrust propagation. Provenance is not a label someone attached — it is a chain in the
+ledger, independently verifiable.
 
-The result: in a system built on the normative layer, **who to trust is derived from the
-immutable record of what agents have done**, not from configuration that someone set up once and
-forgot. Trust accretes from behaviour. It propagates through peer relationships. It is anchored
-to the causal chain of how agents came to exist. And it is queryable — the same ledger tools
-that surface obligation health surface trust scores.
+The result: who to trust is derived from what agents have done and how their peers have judged
+it. Trust accretes from behaviour. It propagates through relationships. It is anchored to
+provenance. And it is queryable — the same infrastructure that surfaces obligation health
+surfaces trust scores.
 
 ### The core shift
 
-In a system without the normative layer, obligations exist only in the orchestrator's head —
-usually encoded as workflow state, hard to query, impossible to audit, and meaningless across
-agent boundaries. With the normative layer, obligations are first-class infrastructure. They are
-created, tracked, transferred, and resolved by the mesh — not by the LLM. Trust is derived from
-observable behaviour, propagated through peer attestation, and anchored to tamper-evident
-records. Participant provenance is a causal chain, not a configuration file. **The LLM reasons;
-the infrastructure enforces, records, and derives.** That separation is what makes
-enterprise-grade agentic systems possible.
+In a system without the normative layer, obligations live in workflow state that is hard to
+query and impossible to audit across agent boundaries. Regulatory reports are reconstructed
+from logs that were never designed to carry evidential weight. Trust is configuration. Delegation
+trails go cold. Accountability is ambiguous by design.
+
+With the normative layer, every commitment is infrastructure. Every delegation is traceable.
+Every failure has a stated reason, formally attributed. Every agent's standing is derived from
+what it has done and how it has been judged. Regulatory evidence is built as the system runs.
+Trust is computed from behaviour, not asserted by configuration.
+
+**The LLM reasons. The infrastructure enforces, records, and derives.** That is not a technical
+detail. It is the difference between an AI system that is capable and one that is
+*accountable* — and in any environment where accountability matters, only the latter is fit for
+purpose.
 
 ---
 
