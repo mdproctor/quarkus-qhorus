@@ -12,7 +12,6 @@ import java.util.stream.Collectors;
 
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.enterprise.inject.Alternative;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.TypedQuery;
@@ -36,7 +35,6 @@ import io.quarkus.hibernate.orm.PersistenceUnit;
  * Refs #101, Epic #99.
  */
 @Priority(10)
-@Alternative
 @ApplicationScoped
 public class MessageLedgerEntryRepository implements LedgerEntryRepository {
 
