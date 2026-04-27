@@ -115,5 +115,216 @@ In a system without the normative layer, obligations exist only in the orchestra
 
 ---
 
+## Grounded in a Real Scenario — Insurance Claim Processing
+
+The best way to understand the normative layer is to watch it work. The following scenario — a
+£180,000 commercial fire damage claim processed by a multi-agent AI system — uses every
+capability the normative layer provides. It is also the reference example for the Quarkus Native
+AI Agent Ecosystem: the same claim scenario is demonstrated at each layer of the stack, with each
+library adding genuine capability to the same story.
+
+### The agents and what they do
+
+Nine agents collaborate to process the claim:
+
+| Agent | Role |
+|---|---|
+| `claims-coordinator` | Orchestrates the full flow |
+| `policy-validator` | Checks coverage terms and exclusions |
+| `sanctions-screener` | Screens claimant against OFAC/HMT lists |
+| `fraud-detection` | Runs ML-based fraud scoring |
+| `damage-assessor` | Evaluates damage and estimates value |
+| `compliance-officer` | Verifies FCA regulatory requirements |
+| `senior-adjuster` | Approves payouts above £100,000 (Lloyd's threshold) |
+| `payment-processor` | Handles BACS and CHAPS disbursements |
+| `regulatory-reporter` | Files Solvency II pre- and post-settlement reports |
+
+Four channels carry the communication: `claim-456` (main flow), `high-value-review`
+(escalation), `compliance-checks` (regulatory), `payments`.
+
+### The claim, step by step, and which layer handles it
+
+**Step 1 — Is the policy valid?**
+The coordinator sends a QUERY: *"Is policy UK-2024-789 active and does it cover commercial fire
+damage?"* The policy-validator responds: *"Active, fire covered, maximum payout £500,000."*
+
+*Layer 1 in action.* A QUERY is a speech act that creates an expectation. The RESPONSE
+discharges it. No obligation was created — this is an information exchange, not a commitment.
+The 9-type taxonomy distinguishes QUERY from COMMAND precisely because asking a question and
+demanding an action are categorically different acts with different consequences.
+
+---
+
+**Step 2 — Sanctions screening**
+COMMAND: *"Screen Acme Corp against OFAC and HMT sanctions lists."* The sanctions-screener
+sends STATUS: *"Screening in progress."* Then DONE: *"No matches found."*
+
+*Layer 2 in action.* COMMAND creates an obligation in the CommitmentStore: the
+sanctions-screener now owes a result. STATUS extends the deadline window — the obligation is
+live. DONE fulfills it and closes the commitment. If the sanctions-screener had gone silent, the
+CommitmentStore would show OPEN past the deadline, and `list_stalled_obligations` would surface
+it automatically.
+
+---
+
+**Step 3 — Fraud detection with telemetry**
+COMMAND: *"Score this claim for fraud risk."* The fraud-detection agent invokes its ML model,
+emits an EVENT — tool `ml-fraud-score`, duration 2,341ms, 1,200 tokens — then DONE: *"Risk
+score: LOW (0.12)."*
+
+*Layers 1 and 4 in action.* The COMMAND created an obligation (Layer 2). The EVENT is a
+telemetry speech act — it carries observability data without creating a new obligation.
+`summarise_telemetry` can later aggregate all EVENT entries to show model performance,
+token consumption, and latency across the full claim. The normative ledger records both the DONE
+(the fulfillment) and the EVENT (the evidence) as immutable entries, causally linked.
+
+---
+
+**Step 4 — The external surveyor who never responds**
+COMMAND: *"Assess fire damage at 42 Industrial Way — dispatch a surveyor."* The damage-assessor
+sends STATUS: *"Surveyor dispatched."* Then silence.
+
+*Layer 2 and Layer 4 in action.* The obligation remains OPEN past its deadline — state
+EXPIRED in the CommitmentStore. `list_stalled_obligations` returns this COMMAND immediately,
+flagging it as stalled for 45+ seconds. The normative ledger holds the permanent record: a
+COMMAND was issued, a STATUS was reported, and no terminal resolution ever arrived. No custom
+timeout code. No polling loop. The infrastructure surfaces the failure.
+
+---
+
+**Step 5 — A QUERY bridges the gap**
+Since the surveyor is unresponsive, the coordinator asks: *"Can you estimate the damage without a
+site visit?"* QUERY → RESPONSE: *"Based on photos provided: estimated £180,000."*
+
+Two information exchanges (Steps 1 and 5) and two obligations (Steps 2 and 4) have already
+shown the difference between asking and committing. The taxonomy enforces that distinction at
+the infrastructure level, not at the LLM reasoning level.
+
+---
+
+**Step 6 — The compliance check that fails**
+COMMAND: *"Verify this claim meets FCA disclosure requirements for commercial fire payouts."*
+DECLINE: *"Non-compliant. This claim exceeds £100,000 — Lloyd's syndicate approval is required
+before settlement. Approval not on file."*
+
+*Layer 3 in action.* A DECLINE is not an error. It is a first-class speech act — a formal
+refusal with a stated reason. The CommitmentStore moves to DECLINED. The normative ledger records
+the reason verbatim. The coordinator can now act on a specific, structured response rather than
+parsing free text or catching an exception. Without Layer 3, "compliance failed" is a string.
+With it, it is a typed speech act with a causal record.
+
+---
+
+**Step 7 — Escalation via HANDOFF**
+COMMAND to compliance-officer: *"Request Lloyd's syndicate approval for a £180,000 commercial
+payout."* The compliance-officer sends HANDOFF to senior-adjuster: *"Exceeds my authority — I
+am transferring this obligation to the senior adjuster."* The senior-adjuster sends STATUS:
+*"Consulting syndicate."* Then DONE: *"Syndicate approval granted. Reference: LLY-2026-04-789."*
+
+*Layer 3 in full.* The HANDOFF is defeasible reasoning in action: the original obligation is not
+abandoned, it is formally transferred. The CommitmentStore moves to DELEGATED, then — when the
+senior-adjuster resolves it — to FULFILLED. The normative ledger records three entries, each
+linked by `causedByEntryId`:
+```
+seq=1  COMMAND → causedByEntryId: null           (coordinator issued it)
+seq=2  HANDOFF → causedByEntryId: <seq=1 id>     (compliance-officer transferred it)
+seq=3  DONE    → causedByEntryId: <seq=2 id>     (senior-adjuster resolved it)
+```
+`get_causal_chain` on the DONE entry returns this complete ancestry. `get_obligation_chain`
+returns the full history plus the live CommitmentStore state. This is the proof chain a regulator
+would ask for: who was responsible, when the obligation transferred, and who discharged it.
+
+---
+
+**Steps 8–9 — Re-verification and regulatory filing**
+With syndicate approval in hand, compliance re-verifies (DONE). The regulatory-reporter files
+a Solvency II pre-notification — COMMAND, then an EVENT (external API call, 450ms), then DONE.
+Reference `FCA-2026-04-001` recorded in the DONE entry's content field.
+
+The normative ledger now contains a Solvency II audit trail that was built as the system ran.
+No separate regulatory reporting system. No log scraping. The EVENT captures the API call
+latency for performance monitoring; the DONE captures the regulatory reference for compliance
+evidence.
+
+---
+
+**Step 10 — Payment failure and recovery**
+COMMAND: *"Process BACS payout of £180,000 to Acme Corp."* FAILURE: *"BACS validation failed —
+sort code 20-14-09 is not registered."*
+
+Then: COMMAND: *"Retry via CHAPS."* STATUS: *"CHAPS processing."* DONE: *"Payment confirmed.
+Reference: CHAPS-2026-04-001."*
+
+Two obligations: one FAILED, one FULFILLED. The normative ledger captures both, with full
+causal linkage. `get_obligation_stats` on the payments channel shows: total=2, fulfilled=1,
+failed=1, fulfillment_rate=0.5. `get_agent_history` for `payment-processor` shows both entries
+in sequence — the failure and the recovery — without any custom query.
+
+---
+
+**Steps 12–13 — Regulatory close-out and audit seal**
+Post-settlement Solvency II report filed (DONE). Audit record sealed (DONE).
+
+The final state: the normative ledger holds 18 entries across four channels, causally linked,
+SHA-256 hash-chained, tamper-evident. Every COMMAND has a terminal resolution. The one stalled
+obligation (the surveyor) is permanently recorded as unresolved — not deleted, not hidden,
+permanently visible as a gap in the audit trail.
+
+---
+
+### What the dashboard shows
+
+The Agent Mesh Dashboard — built with Tamboui TUI, running inside Quarkus — renders this state
+in real time as the scenario advances step by step:
+
+```
+╔══════════════════════════════════════════════════════════════════════════════╗
+║  Acme Corp — Fire Damage Claim #456  [s: next  r: reset  q: quit]          ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║  CHANNEL OBLIGATION HEALTH                                                  ║
+║  Channel            │ Commands │ Done │ Failed │ Declined │ Stalled         ║
+║  claim-456          │    7     │  4   │   0    │    0     │   1    ⚠        ║  ← yellow
+║  compliance-checks  │    3     │  3   │   0    │    1     │   0    ✓        ║  ← green
+║  high-value-review  │    1     │  1   │   0    │    0     │   0    ✓        ║  ← green
+║  payments           │    2     │  1   │   1    │    0     │   0    ⚠        ║  ← yellow
+╠══════════════════════════════════════════════════════════════════════════════╣
+║  RECENT OBLIGATIONS                                                         ║
+║  corr-pay-2   COMMAND → DONE     payment-processor   CHAPS confirmed   ✓   ║  ← green
+║  corr-pay-1   COMMAND → FAILURE  payment-processor   Invalid sort code  ✗   ║  ← red
+║  corr-solvii  COMMAND → DONE     regulatory-reporter Pre-notification   ✓   ║  ← green
+║  corr-comp-2  COMMAND → DONE     compliance-officer  FCA re-verified    ✓   ║  ← green
+║  corr-comp-1  COMMAND → DECLINE  compliance-officer  Missing syndicate  ⊘   ║  ← orange
+║  corr-surv    COMMAND → STALLED  damage-assessor     Awaiting surveyor  ⏳  ║  ← yellow
+╠══════════════════════════════════════════════════════════════════════════════╣
+║  CONSOLE                                                                    ║
+║  [10:04:23] DONE — CHAPS payment confirmed: CHAPS-2026-04-001               ║
+║  [10:03:47] FAILURE — BACS rejected: invalid sort code 20-14-09             ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+```
+
+The colour of each row is determined by the message type of the terminal entry — green for DONE,
+red for FAILURE, orange for DECLINE, yellow for STALLED, magenta for HANDOFF in progress. The
+channel health column turns yellow when stalled obligations exist, red when failures are
+unrecovered. The entire display is driven by the seven ledger query tools — no custom dashboard
+queries, no bespoke reporting logic.
+
+### The layered ecosystem
+
+This same scenario is the reference example across the full Quarkus Native AI Agent Ecosystem:
+
+| Layer | Library added | What changes in the scenario |
+|---|---|---|
+| 1 | quarkus-qhorus + quarkus-ledger | Synthetic agents, keyboard-driven, full obligation trail |
+| 2 | + quarkus-work | Claims become real work items with inboxes; agents pick up tasks from queues |
+| 3 | + claudony | Agents are real LLM instances; coordinator reasons about which agent to assign |
+| 4 | + casehub | Claims are real cases from the CaseHub engine; full production stack |
+
+Each layer adds genuine capability to the same claim. The dashboard structure, the obligation
+board builders, and the ledger query tools carry through unchanged. The scenario driver is the
+only thing replaced at each layer — by an `@Alternative` CDI bean that connects to the layer's
+own data source. Extension, not duplication.
+
+---
+
 *Quarkus Qhorus — the agent communication mesh for the Quarkus Native AI Agent Ecosystem.*
 *Theoretical foundation documented in ADR-0005. Implementation at [casehubio/quarkus-qhorus](https://github.com/casehubio/quarkus-qhorus).*
