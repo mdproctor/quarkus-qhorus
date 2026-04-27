@@ -38,7 +38,7 @@ graph LR
 | Topology | Point-to-point (caller → known callee) | Mesh (N:N named channels) |
 | Addressing | Explicit endpoint URL | Channel name or capability tag |
 | Channels / pub-sub | None | Yes |
-| Typed messages | No (content-opaque) | Yes (6 types) |
+| Typed messages | No (content-opaque) | Yes (9 types) |
 | Peer presence | Static Agent Cards | Live instance registry |
 | Wait-for-any | No | Yes (`wait_for_reply`) |
 | Shared data store | No | Yes (artefact refs + lifecycle) |
@@ -188,6 +188,7 @@ All tools exposed via the single `/mcp` Streamable HTTP endpoint.
 | Tool | Description |
 |---|---|
 | `register` | Register presence with capability tags. Returns active channels and online instances. Optional `claudony_session_id` for Claudony-managed workers. |
+| `deregister_instance` | Deregister an instance from the registry. |
 | `list_instances` | Live roster with status, capabilities, last-seen. Supports filter by capability tag. |
 
 ### Channel Operations
@@ -197,16 +198,60 @@ All tools exposed via the single `/mcp` Streamable HTTP endpoint.
 | `create_channel` | Create a named channel with declared semantic (`APPEND` default). |
 | `list_channels` | All channels with message count, last activity, active senders. |
 | `find_channel` | Keyword search over channel names and descriptions. |
+| `channel_digest` | Summary digest of a channel — message count, active senders, last activity. |
+| `clear_channel` | Remove all messages from a channel. |
+| `pause_channel` | Pause a channel — new messages are queued but not delivered. |
+| `resume_channel` | Resume a paused channel and flush queued messages. |
+| `force_release_channel` | Force-release a BARRIER or COLLECT channel without all contributors. |
+| `set_channel_admins` | Declare admin instances for a channel. |
+| `set_channel_rate_limits` | Configure per-instance or per-channel rate limits. |
+| `set_channel_writers` | Restrict write access to named instances or capability tags. |
 
 ### Messaging
 
 | Tool | Description |
 |---|---|
-| `send_message` | Post to a channel. Type required. `handoff` auto-includes `target` validation. `request` auto-generates `correlation_id` if not supplied. |
-| `check_messages` | Poll for new messages. Supports `after_id`, `limit`, sender filter. Returns messages + last ID for subsequent polling. |
+| `send_message` | Post to a channel. Type required. `handoff` auto-includes `target` validation. QUERY/COMMAND auto-generate `correlation_id` if not supplied. |
+| `check_messages` | Poll for new messages. Excludes EVENT messages (use `read_observer_events` for those). Supports `after_id`, `limit`, sender filter. Returns messages + last ID for subsequent polling. |
 | `wait_for_reply` | Persistent long-poll with SSE keepalives. Polls Commitment state by `correlation_id` — wakes when state reaches FULFILLED, DECLINED, FAILED, or EXPIRED. Re-entrant safe: uses UUID not positional matching. Transparently follows HANDOFF delegation chains. |
+| `cancel_wait` | Cancel an in-progress `wait_for_reply` for a given correlation ID. |
 | `get_replies` | Retrieve all replies to a specific message ID. |
+| `delete_message` | Delete a message by ID. |
 | `search_messages` | Full-text search across all channels. |
+
+### Observability
+
+| Tool | Description |
+|---|---|
+| `register_observer` | Register an observer to receive EVENT messages on a channel. |
+| `deregister_observer` | Unregister an observer. |
+| `read_observer_events` | Read EVENT messages delivered to a registered observer. |
+| `list_ledger_entries` | Query the immutable audit ledger. Supports `type_filter` (e.g. `COMMAND,DONE,FAILURE`), `agent_id`, `after_id`, `limit`. Returns causal chain via `caused_by_entry_id`. |
+| `get_channel_timeline` | Ordered view of all message types on a channel, including EVENT telemetry. |
+
+### Commitments
+
+| Tool | Description |
+|---|---|
+| `get_commitment` | Retrieve the current state of a commitment by correlation ID. |
+| `list_my_commitments` | List all active commitments for the calling instance. |
+| `list_pending_waits` | List all in-progress `wait_for_reply` sessions. |
+
+### Approval Gates
+
+| Tool | Description |
+|---|---|
+| `request_approval` | Submit an action for human or agent approval. Blocks until approved, declined, or timed out. |
+| `respond_to_approval` | Respond to a pending approval request (approve or decline). |
+| `list_pending_approvals` | List all approval requests awaiting response. |
+
+### Watchdogs
+
+| Tool | Description |
+|---|---|
+| `register_watchdog` | Register a condition-based alert on a channel (e.g. inactivity timeout, message threshold). |
+| `delete_watchdog` | Remove a registered watchdog. |
+| `list_watchdogs` | List all registered watchdogs with their conditions. |
 
 ### Shared Data / Artefacts
 
@@ -217,6 +262,7 @@ All tools exposed via the single `/mcp` Streamable HTTP endpoint.
 | `list_shared_data` | All artefacts with size, owner, description. |
 | `claim_artefact` | Declare this instance holds a reference. Prevents GC. |
 | `release_artefact` | Release the reference. GC-eligible when all claiming instances release. |
+| `revoke_artefact` | Forcibly revoke an artefact — marks it unavailable regardless of active claims. |
 
 ### Addressing Modes
 
@@ -438,12 +484,36 @@ erDiagram
         timestamp claimed_at
     }
 
-    PENDING_REPLY {
+    COMMITMENT {
         uuid id PK
-        string correlation_id UK
-        uuid instance_id FK
+        string correlation_id
+        string state
+        string obligor
+        string requester
         uuid channel_id FK
+        timestamp created_at
+        timestamp updated_at
         timestamp expires_at
+    }
+
+    MESSAGE_LEDGER_ENTRY {
+        uuid id PK
+        uuid channel_id FK
+        bigint message_id FK
+        string message_type
+        string entry_type
+        string actor_id
+        string target
+        text content
+        string correlation_id
+        uuid commitment_id FK
+        uuid caused_by_entry_id FK
+        int sequence_number
+        timestamp occurred_at
+        string digest
+        string tool_name
+        bigint duration_ms
+        bigint token_count
     }
 
     CHANNEL ||--o{ MESSAGE : contains
@@ -451,6 +521,9 @@ erDiagram
     INSTANCE ||--o{ ARTEFACT_CLAIM : claims
     SHARED_DATA ||--o{ ARTEFACT_CLAIM : claimed_by
     MESSAGE ||--o{ MESSAGE : replies_to
+    CHANNEL ||--o{ COMMITMENT : tracked_by
+    CHANNEL ||--o{ MESSAGE_LEDGER_ENTRY : audited_by
+    MESSAGE ||--o{ MESSAGE_LEDGER_ENTRY : recorded_as
 ```
 
 ---
@@ -587,7 +660,7 @@ Storing `reply_count` as a denormalized column trades a small write overhead (in
 | **9 — A2A compat** | Optional A2A endpoint for external orchestrator interop |
 | **10 — Human-in-the-loop controls** | `pause_channel` / `resume_channel`; `request_approval` (agent-callable, blocks until human responds); external cancellation of pending `wait_for_reply`; force-close BARRIER/COLLECT channels; artefact revocation |
 | **11 — Access control and governance** | Per-channel write permissions (declare allowed `instance_id`s or `capability:tag`s); admin role (a designated instance can pause/resume/close channels on behalf of others); rate limiting per channel or per instance; read-only observer mode (subscribe to events without appearing in the instance registry) |
-| **12 — Structured observability** | Mandatory `event` message payload schema (`agent_id`, `tool_name`, `timestamp`, `duration_ms`, optional `correlation_id`, optional `token_count`); `list_events(channel_name, after_id, limit)` query tool; `get_channel_timeline` — ordered view of all message types for a channel; structured audit trail queryable by time range and agent |
+| **12 — Normative audit ledger** ✓ | All 9 message types recorded as immutable `MessageLedgerEntry` (SHA-256 hash-chained, JPA JOINED inheritance on quarkus-ledger `LedgerEntry`). `list_ledger_entries(channel_name, type_filter, agent_id, after_id, limit)` query tool; `get_channel_timeline` — ordered view of all message types for a channel. Causal chain via `caused_by_entry_id`. EVENT entries carry telemetry fields (`tool_name`, `duration_ms`, `token_count`). Complete audit trail queryable by type, agent, and time range. |
 
 ---
 
