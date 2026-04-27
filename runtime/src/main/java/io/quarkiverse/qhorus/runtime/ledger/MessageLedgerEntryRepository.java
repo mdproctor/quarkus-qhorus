@@ -70,6 +70,18 @@ public class MessageLedgerEntryRepository implements LedgerEntryRepository {
      */
     public List<MessageLedgerEntry> listEntries(final UUID channelId, final Set<String> messageTypes,
             final Long afterSequence, final String agentId, final Instant since, final int limit) {
+        return listEntries(channelId, messageTypes, afterSequence, agentId, since, null, false, limit);
+    }
+
+    /**
+     * Extended variant adding optional {@code correlationId} filter and sort direction.
+     *
+     * @param correlationId if non-null/blank, only entries with this correlationId
+     * @param sortDesc if true, ORDER BY sequenceNumber DESC (most recent first)
+     */
+    public List<MessageLedgerEntry> listEntries(final UUID channelId, final Set<String> messageTypes,
+            final Long afterSequence, final String agentId, final Instant since,
+            final String correlationId, final boolean sortDesc, final int limit) {
 
         final StringBuilder jpql = new StringBuilder(
                 "SELECT e FROM MessageLedgerEntry e WHERE e.subjectId = ?1");
@@ -92,7 +104,13 @@ public class MessageLedgerEntryRepository implements LedgerEntryRepository {
             jpql.append(" AND e.occurredAt >= ?").append(params.size() + 1);
             params.add(since);
         }
-        jpql.append(" ORDER BY e.sequenceNumber ASC");
+        if (correlationId != null && !correlationId.isBlank()) {
+            jpql.append(" AND e.correlationId = ?").append(params.size() + 1);
+            params.add(correlationId);
+        }
+        jpql.append(sortDesc
+                ? " ORDER BY e.sequenceNumber DESC"
+                : " ORDER BY e.sequenceNumber ASC");
 
         final TypedQuery<MessageLedgerEntry> query = em.createQuery(jpql.toString(), MessageLedgerEntry.class);
         for (int i = 0; i < params.size(); i++) {
@@ -100,6 +118,135 @@ public class MessageLedgerEntryRepository implements LedgerEntryRepository {
         }
         query.setMaxResults(limit);
         return query.getResultList();
+    }
+
+    // ── New query methods for Epic #110 ───────────────────────────────────────
+
+    /**
+     * All ledger entries for a given {@code correlationId} on this channel, ordered ASC.
+     * Used by {@code get_obligation_chain} and as an alternative to the filtered
+     * {@link #listEntries} when no other filters are needed.
+     */
+    public List<MessageLedgerEntry> findAllByCorrelationId(final UUID channelId,
+            final String correlationId) {
+        return em.createQuery(
+                "SELECT e FROM MessageLedgerEntry e " +
+                        "WHERE e.subjectId = :cid AND e.correlationId = :corr " +
+                        "ORDER BY e.sequenceNumber ASC",
+                MessageLedgerEntry.class)
+                .setParameter("cid", channelId)
+                .setParameter("corr", correlationId)
+                .getResultList();
+    }
+
+    /**
+     * Walks {@code causedByEntryId} links upward from {@code entryId} to the root,
+     * returning the chain ordered oldest-first (root first, given entry last).
+     *
+     * <p>
+     * Stops at channel boundaries and on cycles (cycle-guard via visited set).
+     * Returns an empty list if {@code entryId} does not exist in this channel.
+     */
+    public List<MessageLedgerEntry> findAncestorChain(final UUID channelId,
+            final UUID entryId) {
+        final List<MessageLedgerEntry> chain = new ArrayList<>();
+        UUID currentId = entryId;
+        final Set<UUID> visited = new java.util.HashSet<>();
+        while (currentId != null && !visited.contains(currentId)) {
+            visited.add(currentId);
+            final MessageLedgerEntry entry = em.find(MessageLedgerEntry.class, currentId);
+            if (entry == null || !channelId.equals(entry.channelId)) {
+                break;
+            }
+            chain.add(entry);
+            currentId = entry.causedByEntryId;
+        }
+        Collections.reverse(chain);
+        return chain;
+    }
+
+    /**
+     * COMMAND entries on this channel whose {@code occurredAt} is before {@code olderThan}
+     * and which have no terminal sibling (DONE / FAILURE / DECLINE / HANDOFF) sharing
+     * the same {@code correlationId}. These are the stalled obligations.
+     */
+    public List<MessageLedgerEntry> findStalledCommands(final UUID channelId,
+            final Instant olderThan) {
+        return em.createQuery(
+                "SELECT c FROM MessageLedgerEntry c " +
+                        "WHERE c.subjectId = :cid " +
+                        "AND c.messageType = 'COMMAND' " +
+                        "AND c.occurredAt < :olderThan " +
+                        "AND NOT EXISTS (" +
+                        "  SELECT t FROM MessageLedgerEntry t " +
+                        "  WHERE t.subjectId = :cid " +
+                        "  AND t.correlationId = c.correlationId " +
+                        "  AND t.messageType IN ('DONE', 'FAILURE', 'DECLINE', 'HANDOFF')" +
+                        ")",
+                MessageLedgerEntry.class)
+                .setParameter("cid", channelId)
+                .setParameter("olderThan", olderThan)
+                .getResultList();
+    }
+
+    /**
+     * Count of each outcome-relevant message type on this channel.
+     * Returns a map containing keys from {@code COMMAND, DONE, FAILURE, DECLINE, HANDOFF}
+     * (absent keys mean zero occurrences).
+     */
+    public Map<String, Long> countByOutcome(final UUID channelId) {
+        final List<Object[]> rows = em.createQuery(
+                "SELECT e.messageType, COUNT(e) FROM MessageLedgerEntry e " +
+                        "WHERE e.subjectId = :cid " +
+                        "AND e.messageType IN ('COMMAND', 'DONE', 'FAILURE', 'DECLINE', 'HANDOFF') " +
+                        "GROUP BY e.messageType",
+                Object[].class)
+                .setParameter("cid", channelId)
+                .getResultList();
+        final Map<String, Long> result = new java.util.HashMap<>();
+        for (final Object[] row : rows) {
+            result.put((String) row[0], (Long) row[1]);
+        }
+        return result;
+    }
+
+    /**
+     * All entries for {@code actorId} on this channel, ordered by sequence number
+     * descending (most recent first), capped at {@code limit}.
+     */
+    public List<MessageLedgerEntry> findByActorIdInChannel(final UUID channelId,
+            final String actorId, final int limit) {
+        return em.createQuery(
+                "SELECT e FROM MessageLedgerEntry e " +
+                        "WHERE e.subjectId = :cid AND e.actorId = :aid " +
+                        "ORDER BY e.sequenceNumber DESC",
+                MessageLedgerEntry.class)
+                .setParameter("cid", channelId)
+                .setParameter("aid", actorId)
+                .setMaxResults(limit)
+                .getResultList();
+    }
+
+    /**
+     * All EVENT entries on this channel at or after {@code since} (pass null for all).
+     * Used by the tool layer to compute per-tool telemetry aggregations in Java.
+     */
+    public List<MessageLedgerEntry> findEventsSince(final UUID channelId,
+            final Instant since) {
+        final StringBuilder jpql = new StringBuilder(
+                "SELECT e FROM MessageLedgerEntry e " +
+                        "WHERE e.subjectId = :cid AND e.messageType = 'EVENT'");
+        if (since != null) {
+            jpql.append(" AND e.occurredAt >= :since");
+        }
+        jpql.append(" ORDER BY e.sequenceNumber ASC");
+        final TypedQuery<MessageLedgerEntry> q = em.createQuery(jpql.toString(),
+                MessageLedgerEntry.class)
+                .setParameter("cid", channelId);
+        if (since != null) {
+            q.setParameter("since", since);
+        }
+        return q.getResultList();
     }
 
     /**
