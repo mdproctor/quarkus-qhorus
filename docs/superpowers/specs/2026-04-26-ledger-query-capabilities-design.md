@@ -53,58 +53,92 @@ exactly: pure static builders, CDI beans, PicoCLI entry point, Tamboui TUI rende
 
 ---
 
-## 3. MCP Tool Enhancements
+## 3. MCP Tool Design — Rationale
 
-### 3.1 Enhance `list_ledger_entries` — add `correlation_id` filter
+Before the tool definitions, three design decisions that emerged from a systematic review
+against the existing 41-tool surface:
 
-Add an optional `correlation_id` parameter to the existing tool. All other filters still apply.
+**`get_obligation_chain` returns summary + commitment only — not raw entries.** Raw entries
+for a correlation_id are already available via `list_ledger_entries(correlation_id=X)`.
+Returning them again in `get_obligation_chain` would be redundant. The value of
+`get_obligation_chain` is the *computed* enrichment: participants, elapsed time, handoff
+count, resolution type, and live CommitmentStore state — none of which can be derived from
+a single existing tool call.
 
-### 3.2 `get_obligation_chain`
+**`get_agent_history` does not exist.** `list_ledger_entries` already filters by `agent_id`.
+Rather than a separate tool, `list_ledger_entries` gains a `sort=asc|desc` parameter (default
+`asc` for audit trail; `desc` for "most recent first" agent inspection). One parameter, not
+one new tool.
+
+**`get_telemetry_summary` not `summarise_telemetry`.** All 41 existing tools use American
+English and `get_*` for queries returning a computed single result. `summarise` (British) +
+verb-first breaks both conventions.
+
+**`get_causal_chain` is a compliance/audit tool.** It takes a `ledger_entry_id` (UUID) that
+agents only have after calling `list_ledger_entries`. Its description makes this explicit —
+it is not an agent-runtime query, it is an audit and debugging tool for developers and
+compliance officers tracing obligation lineage.
+
+---
+
+## 4. MCP Tool Enhancements
+
+### 4.1 Enhance `list_ledger_entries` — add `correlation_id` and `sort` parameters
+
+Two new optional parameters:
+- `correlation_id` — when provided, only entries with matching `correlationId` are returned
+- `sort` — `asc` (default, chronological audit trail) or `desc` (most recent first)
+
+All other filters still apply. This replaces the need for a separate `get_agent_history` tool.
+
+### 4.2 `get_obligation_chain`
 
 ```
 get_obligation_chain(channel_name, correlation_id)
 ```
 
-Returns all ledger entries for the obligation in sequence order, plus the live `Commitment` state
-from CommitmentStore, plus a computed summary:
+Returns computed enrichment for the obligation — **not raw entries** (use
+`list_ledger_entries(correlation_id=X)` for those):
 
 ```json
 {
-  "summary": {
-    "correlation_id": "corr-abc",
-    "initiator": "claims-coordinator",
-    "created_at": "2026-04-26T10:00:00Z",
-    "resolved_at": "2026-04-26T10:04:23Z",
-    "elapsed_seconds": 263,
-    "resolution": "DONE",
-    "participants": ["claims-coordinator", "damage-assessor"],
-    "handoff_count": 0
-  },
-  "commitment": { "state": "FULFILLED", "obligor": "damage-assessor" },
-  "entries": [ ... ]
+  "correlation_id": "corr-abc",
+  "initiator": "claims-coordinator",
+  "created_at": "2026-04-26T10:00:00Z",
+  "resolved_at": "2026-04-26T10:04:23Z",
+  "elapsed_seconds": 263,
+  "resolution": "DONE",
+  "participants": ["claims-coordinator", "damage-assessor"],
+  "handoff_count": 0,
+  "commitment": { "state": "FULFILLED", "obligor": "damage-assessor", "requester": "claims-coordinator" }
 }
 ```
 
-### 3.3 `get_causal_chain`
+`commitment` is null if no matching Commitment exists (not an error).
+`resolution` is null if the obligation is still open.
+Unknown `correlation_id` returns null fields, no throw.
+
+### 4.3 `get_causal_chain`
 
 ```
 get_causal_chain(channel_name, ledger_entry_id)
 ```
 
-Walks `causedByEntryId` links upward from the given entry to the root. Returns the chain oldest
-first. Never throws on a missing chain — returns the single entry with an empty ancestors list.
+*Compliance and audit tool.* Takes a ledger entry UUID (obtained from `list_ledger_entries`)
+and walks `causedByEntryId` links upward to the root. Returns the chain ordered oldest first.
+Never throws on a missing chain — returns the single entry with an empty `ancestors` list.
 
-### 3.4 `list_stalled_obligations`
+### 4.4 `list_stalled_obligations`
 
 ```
 list_stalled_obligations(channel_name, older_than_seconds? = 30)
 ```
 
-Returns all COMMAND entries with no DONE/FAILURE/DECLINE/HANDOFF sibling and whose `occurredAt`
-is older than the threshold. Each result includes `correlation_id`, `actor_id`, `content`,
-`occurred_at`, `stalled_for_seconds`.
+Returns all COMMAND entries with no DONE/FAILURE/DECLINE/HANDOFF sibling sharing the same
+`correlationId`, whose `occurredAt` is older than the threshold. Each result includes
+`correlation_id`, `actor_id`, `content`, `occurred_at`, `stalled_for_seconds`.
 
-### 3.5 `get_obligation_stats`
+### 4.5 `get_obligation_stats`
 
 ```
 get_obligation_stats(channel_name)
@@ -117,18 +151,10 @@ get_obligation_stats(channel_name)
 }
 ```
 
-### 3.6 `get_agent_history`
+### 4.6 `get_telemetry_summary`
 
 ```
-get_agent_history(channel_name, instance_id, limit? = 20)
-```
-
-All ledger entries where `actor_id = instance_id`, sequence descending.
-
-### 3.7 `summarise_telemetry`
-
-```
-summarise_telemetry(channel_name, since?)
+get_telemetry_summary(channel_name, since?)
 ```
 
 ```json
@@ -145,7 +171,7 @@ summarise_telemetry(channel_name, since?)
 
 ---
 
-## 4. Repository Additions
+## 5. Repository Additions
 
 Six new query methods on `MessageLedgerEntryRepository`:
 
@@ -160,7 +186,7 @@ Six new query methods on `MessageLedgerEntryRepository`:
 
 ---
 
-## 5. Layered Example Architecture
+## 6. Layered Example Architecture
 
 ### 5.1 Module
 
@@ -234,7 +260,7 @@ Sub-project 5 — + casehub  (casehub-engine repo)
 
 ---
 
-## 6. The Insurance Claim Scenario (`claim-456`)
+## 7. The Insurance Claim Scenario (`claim-456`)
 
 ### 6.1 Agents and channels
 
@@ -275,12 +301,12 @@ These feed the Bayesian Beta and EigenTrust trust models in quarkus-ledger.
 - **Attestations**: steps 3a and 7a feed EigenTrust and Bayesian Beta trust scoring ✓
 - **Stalled detection**: step 4 surveyor never responds ✓
 - **Regulatory subsystem**: Solvency II, FCA, Lloyd's — audit ledger has legal weight ✓
-- **Telemetry**: ML model (step 3) and external API (step 9) — `summarise_telemetry` ✓
+- **Telemetry**: ML model (step 3) and external API (step 9) — `get_telemetry_summary` ✓
 - **Trust derivation**: peer attestations visible in trust panel; EigenTrust propagates ✓
 
 ---
 
-## 7. Tamboui Dashboard Design
+## 8. Tamboui Dashboard Design
 
 ### 7.1 Four-panel layout (Sub-project 1 has three; trust panel added in Sub-project 2)
 
@@ -366,7 +392,7 @@ show a uniform prior. Scores shift as peers attest to their decisions during the
 
 ---
 
-## 8. Testing Strategy
+## 9. Testing Strategy
 
 ### 8.1 Unit tests — pure builders
 
@@ -414,7 +440,7 @@ show a uniform prior. Scores shift as peers attest to their decisions during the
 - 2 DONE, 1 FAILURE, 1 DECLINE → rates correct
 - `fulfillment_rate` = fulfilled / total_commands
 
-**`summarise_telemetry` correctness:**
+**`get_telemetry_summary` correctness:**
 - Three EVENTs same tool → count=3, avg correct
 - Missing `tool_name` → counted under null, no throw
 - Non-EVENT entries excluded
@@ -435,13 +461,13 @@ Drive all 15 steps via `DefaultClaimScenarioDriver.advance()` × 15. Then assert
 - `get_obligation_stats` per channel matches expected counts
 - `list_stalled_obligations` returns exactly step 4 (surveyor)
 - `get_causal_chain` on step 7 DONE returns the 3-entry chain
-- `summarise_telemetry` shows two tools (ML fraud scorer, Solvency II API)
+- `get_telemetry_summary` shows two tools (ML fraud scorer, Solvency II API)
 - After steps 3a and 7a: `ActorTrustScore` updated for attested agents
 - Dashboard renders without exception (TuiTestRunner smoke test)
 
 ---
 
-## 9. Documentation Updates
+## 10. Documentation Updates
 
 - `docs/specs/2026-04-13-qhorus-design.md`: add all 7 tools to MCP surface; update Normative
   Audit Ledger section with new tool descriptions and attestation/trust context
@@ -450,7 +476,7 @@ Drive all 15 steps via `DefaultClaimScenarioDriver.advance()` × 15. Then assert
 
 ---
 
-## 10. Extension Points — Claudony and CaseHub
+## 11. Extension Points — Claudony and CaseHub
 
 ### 10.1 What to depend on
 
@@ -494,7 +520,7 @@ have non-uniform priors even before their first attested decision. The causal ch
 
 ---
 
-## 11. Affected Files
+## 12. Affected Files
 
 ### Sub-project 1: Ledger Query Tools
 
@@ -529,7 +555,7 @@ have non-uniform priors even before their first attested decision. The causal ch
 
 ---
 
-## 12. Issue and Epic Structure
+## 13. Issue and Epic Structure
 
 One epic per sub-project. Each is independently closeable.
 
