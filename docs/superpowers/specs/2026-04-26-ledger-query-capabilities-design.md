@@ -284,40 +284,33 @@ accumulate; the scenario driver is replaced. The board builders are never duplic
 
 | Step | Type | Channel | From → To | What happens |
 |---|---|---|---|---|
-| 1 | QUERY → RESPONSE | claim-456 | coordinator → policy-validator | "Policy UK-2024-789 active? Fire covered?" → "Yes, max £500k" |
-| 2 | COMMAND → STATUS → DONE | claim-456 | coordinator → sanctions-screener | OFAC/HMT screen on Acme Corp — clear |
-| 3 | COMMAND + EVENT + DONE | claim-456 | coordinator → fraud-detection | ML fraud score (EVENT: 2.3s, 1200 tokens) — LOW 0.12 |
-| 4 | COMMAND → STATUS → (STALLED) | claim-456 | coordinator → damage-assessor | External surveyor dispatched — never responds |
-| 5 | QUERY → RESPONSE | claim-456 | coordinator → damage-assessor | "Estimate without site visit?" → "£180k from photos" |
-| 6 | COMMAND → DECLINE | compliance-checks | coordinator → compliance-officer | FCA check fails — missing Lloyd's syndicate approval |
-| 7 | COMMAND → HANDOFF → STATUS → DONE | high-value-review | coordinator → compliance-officer → senior-adjuster | Syndicate approval escalation |
-| 8 | COMMAND → DONE | compliance-checks | coordinator → compliance-officer | Re-verify FCA compliance — passes |
-| 9 | COMMAND + EVENT + DONE | compliance-checks | coordinator → regulatory-reporter | Solvency II pre-notification (EVENT: 450ms API call) |
-| 10 | COMMAND → FAILURE | payments | coordinator → payment-processor | BACS payout £180k — invalid sort code |
-| 11 | COMMAND → STATUS → DONE | payments | coordinator → payment-processor | CHAPS retry — payment confirmed |
-| 12 | COMMAND → DONE | compliance-checks | coordinator → regulatory-reporter | Post-settlement Solvency II report |
-| 13 | COMMAND → DONE | claim-456 | coordinator → audit-trail-keeper | Audit record sealed |
-
-### 6.3 What each step demonstrates
-
-- **All 9 message types** — QUERY, COMMAND, RESPONSE, STATUS, DECLINE, HANDOFF, DONE, FAILURE, EVENT
-- **All 7 CommitmentStore states** — OPEN, ACKNOWLEDGED, FULFILLED, DECLINED, FAILED, DELEGATED, EXPIRED (step 4 stalls)
-- **Causal chain** — step 7: COMMAND → HANDOFF → DONE, two agents, two channels
-- **Stalled detection** — step 4: surveyor never responds; `list_stalled_obligations` surfaces it
-- **Regulatory subsystem** — Solvency II, FCA, Lloyd's — makes the audit ledger obviously load-bearing
-- **Telemetry** — ML model (step 3) and external API (step 9) — feeds `summarise_telemetry`
-- **Multi-channel obligation stats** — 4 channels, different health per channel
-- **Multi-step retry** — step 10 FAILURE → step 11 DONE — shows obligation failure and recovery
-
----
-
-## 7. Tamboui Dashboard Design
-
-### 7.1 Three-panel layout
-
++==============================================================================+
+|  Acme Corp -- Fire Damage Claim #456  [s: next step  r: reset  q: quit]      |
++==============================================================================+
+|  CHANNEL OBLIGATION HEALTH                                                   |
+|  Channel            | Commands | Done | Failed | Declined | Stalled          |
+|  -------------------+----------+------+--------+----------+--------          |
+|  claim-456          |    7     |  4   |   0    |    0     |  1 [!]           |
+|  compliance-checks  |    3     |  3   |   0    |    1     |  0 [ok]          |
+|  high-value-review  |    1     |  1   |   0    |    0     |  0 [ok]          |
+|  payments           |    2     |  1   |   1    |    0     |  0 [!]           |
++==============================================================================+
+|  RECENT OBLIGATIONS                                                          |
+|  corr-pay-2   COMMAND -> DONE     payment-processor   CHAPS confirmed  [ok]  |
+|  corr-pay-1   COMMAND -> FAILURE  payment-processor   Invalid sort code [x]  |
+|  corr-sii-2   COMMAND -> DONE     regulatory-reporter Post-settlement   [ok] |
+|  corr-sii-1   COMMAND -> DONE     regulatory-reporter Pre-notification  [ok] |
+|  corr-comp-2  COMMAND -> DONE     compliance-officer  FCA re-verified   [ok] |
+|  corr-surv    COMMAND -> STALLED  damage-assessor     Awaiting surveyor[~~]  |
++==============================================================================+
+|  CONSOLE                                                                     |
+|  [10:04:23] DONE -- CHAPS payment confirmed: ref CHAPS-2026-04-001           |
+|  [10:03:47] FAILURE -- BACS rejected: invalid sort code 20-14-09             |
+|  [10:03:12] DONE -- Solvency II pre-notification filed: FCA-2026-04-001      |
++==============================================================================+
 ```
 +==============================================================================+
-|  Acme Corp -- Fire Damage Claim #456  [s: next step  r: reset  q: quit]     |
+|  Acme Corp -- Fire Damage Claim #456  [s: next step  r: reset  q: quit]      |
 +==============================================================================+
 |  CHANNEL OBLIGATION HEALTH                                                   |
 |  Channel            | Commands | Done | Failed | Declined | Stalled          |
@@ -328,8 +321,8 @@ accumulate; the scenario driver is replaced. The board builders are never duplic
 |  payments           |    2     |  1   |   1    |    0     |   0    [!]       |
 +==============================================================================+
 |  RECENT OBLIGATIONS                                                          |
-|  corr-pay-2   COMMAND -> DONE     payment-processor   CHAPS confirmed  [ok] |
-|  corr-pay-1   COMMAND -> FAILURE  payment-processor   Invalid sort code [x] |
+|  corr-pay-2   COMMAND -> DONE     payment-processor   CHAPS confirmed  [ok]  |
+|  corr-pay-1   COMMAND -> FAILURE  payment-processor   Invalid sort code [x]  |
 |  corr-sii-2   COMMAND -> DONE     regulatory-reporter Post-settlement   [ok] |
 |  corr-sii-1   COMMAND -> DONE     regulatory-reporter Pre-notification  [ok] |
 |  corr-comp-2  COMMAND -> DONE     compliance-officer  FCA re-verified   [ok] |

@@ -20,15 +20,15 @@
 |                                                                                |
 |   Every speech act permanently recorded. causedByEntryId links each            |
 |   resolution (DONE/FAILURE/DECLINE) back to the COMMAND that created it.       |
-|   Tamper-evident. Queryable. The proof that an obligation existed and           |
-|   how it was resolved -- forever.                                               |
+|   Tamper-evident. Queryable. The proof that an obligation existed and          |
+|   how it was resolved -- forever.                                              |
 +----------------------------------+---------------------------------------------+
                                    |  every resolution proven here
 +-----------------------------------+--------------------------------------------+
 |  LAYER 3 -- DEFEASIBLE REASONING                                               |
 |  "Obligations can be overridden, transferred, or excused -- with reason"       |
 |                                                                                |
-|   HANDOFF  --- "I cannot do this -- agent-C can, and I am transferring it"     |
+|   HANDOFF  --- "I cannot do this -- agent-C can, transferring it"              |
 |   DECLINE  --- "I must refuse -- here is my stated reason"                     |
 |   FAILURE  --- "I tried and could not complete -- here is what happened"       |
 |                                                                                |
@@ -48,7 +48,7 @@
 |              +-----------> DELEGATED --> [continues with new agent]            |
 |                            EXPIRED   --> [deadline passed, never resolved]     |
 |                                                                                |
-|   Infrastructure tracks who owes what to whom -- not the LLM.                 |
+|   Infrastructure tracks who owes what to whom -- not the LLM.                  |
 +----------------------------------+---------------------------------------------+
                                    |  COMMAND creates; DONE/FAILURE/DECLINE closes
 +-----------------------------------+--------------------------------------------+
@@ -56,11 +56,11 @@
 |  "Every message is an illocutionary act -- doing something by saying it"       |
 |                                                                                |
 |   QUERY    -- ask for information       -- creates weak expectation            |
-|   COMMAND  -- ask for action            -- creates obligation  (-> Layer 2)    |
+|   COMMAND  -- ask for action            -- creates obligation (-> Layer 2)     |
 |   RESPONSE -- answer a QUERY            -- discharges expectation              |
 |   STATUS   -- report progress           -- extends the obligation window       |
 |   DECLINE  -- refuse a QUERY/COMMAND    -- terminates with stated reason       |
-|   HANDOFF  -- transfer obligation       -- delegates formally  (-> Layer 3)    |
+|   HANDOFF  -- transfer obligation       -- delegates formally (-> Layer 3)     |
 |   DONE     -- successful completion     -- fulfills obligation                 |
 |   FAILURE  -- failed completion         -- terminates with explanation         |
 |   EVENT    -- telemetry/observability   -- no obligation created               |
@@ -279,23 +279,23 @@ in real time as the scenario advances step by step:
 
 ```
 +==============================================================================+
-|  Acme Corp -- Fire Damage Claim #456   [s: next  r: reset  q: quit]         |
+|  Acme Corp -- Fire Damage Claim #456  [s: next  r: reset  q: quit]           |
 +==============================================================================+
 |  CHANNEL OBLIGATION HEALTH                                                   |
 |  Channel            | Commands | Done | Failed | Declined | Stalled          |
-|  -------------------+----------+------+--------+----------+---------         |
-|  claim-456          |    7     |  4   |   0    |    0     |   1    [!]       |  <- yellow
-|  compliance-checks  |    3     |  3   |   0    |    1     |   0    [ok]      |  <- green
-|  high-value-review  |    1     |  1   |   0    |    0     |   0    [ok]      |  <- green
-|  payments           |    2     |  1   |   1    |    0     |   0    [!]       |  <- yellow
+|  -------------------+----------+------+--------+----------+--------          |
+|  claim-456          |    7     |  4   |   0    |    0     |  1 [!]           |
+|  compliance-checks  |    3     |  3   |   0    |    1     |  0 [ok]          |
+|  high-value-review  |    1     |  1   |   0    |    0     |  0 [ok]          |
+|  payments           |    2     |  1   |   1    |    0     |  0 [!]           |
 +==============================================================================+
 |  RECENT OBLIGATIONS                                                          |
-|  corr-pay-2   COMMAND -> DONE     payment-processor   CHAPS confirmed  [ok] |  <- green
-|  corr-pay-1   COMMAND -> FAILURE  payment-processor   Invalid sort code [x] |  <- red
-|  corr-solvii  COMMAND -> DONE     regulatory-reporter Pre-notification  [ok] |  <- green
-|  corr-comp-2  COMMAND -> DONE     compliance-officer  FCA re-verified   [ok] |  <- green
-|  corr-comp-1  COMMAND -> DECLINE  compliance-officer  Missing syndicate  [o] |  <- orange
-|  corr-surv    COMMAND -> STALLED  damage-assessor     Awaiting surveyor [~~] |  <- yellow
+|  corr-pay-2   COMMAND -> DONE     payment-processor   CHAPS confirmed  [ok]  |
+|  corr-pay-1   COMMAND -> FAILURE  payment-processor   Invalid sort code [x]  |
+|  corr-solvii  COMMAND -> DONE     regulatory-reporter Pre-notification  [ok] |
+|  corr-comp-2  COMMAND -> DONE     compliance-officer  FCA re-verified   [ok] |
+|  corr-comp-1  COMMAND -> DECLINE  compliance-officer  Missing syndicate [o]  |
+|  corr-surv    COMMAND -> STALLED  damage-assessor     Awaiting surveyor[~~]  |
 +==============================================================================+
 |  CONSOLE                                                                     |
 |  [10:04:23] DONE -- CHAPS payment confirmed: CHAPS-2026-04-001               |
