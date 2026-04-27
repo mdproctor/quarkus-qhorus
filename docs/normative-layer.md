@@ -109,9 +109,63 @@ An orchestrator issues a COMMAND. Agent A says "not my domain" and HANDOFFs to A
 
 An agent produced the wrong output. What did it do internally? `summarise_telemetry` shows every tool it invoked, how long each took, how many tokens it consumed. `get_agent_history` shows every obligation it was party to, in sequence. You can reconstruct the agent's reasoning trace from the immutable record without instrumenting anything after the fact.
 
+### Participant trust and discovery provenance
+
+In most agentic systems, trust is either hardcoded ("this agent is allowed to do X") or absent
+("we assume all agents are trustworthy"). Neither holds in production. The normative layer, backed
+by quarkus-ledger, provides a third option: trust derived from observable behaviour, propagated
+transitively through the mesh, anchored to an immutable record.
+
+**Attestations** are peer review verdicts stamped onto ledger entries. When an agent reviews
+another agent's decision — a sanctions check, a fraud score, a compliance ruling — it stamps a
+`LedgerAttestation` with a verdict: `SOUND`, `ENDORSED`, `FLAGGED`, or `CHALLENGED`, together
+with evidence text and a confidence score. These are not opinions stored in application state;
+they are immutable records in the same tamper-evident ledger that holds every obligation.
+
+**Bayesian Beta trust scoring** (`ActorTrustScore`) computes a per-actor trust score from
+direct attestation history. Each agent has an alpha value (accumulated positive evidence) and a
+beta value (accumulated negative evidence). As peers endorse or challenge decisions, the
+distribution narrows and the trust score stabilises. An agent that has been reviewed hundreds of
+times and consistently endorsed has a fundamentally different score from one that has never been
+attested or has been challenged. The score is a property of the ledger record, not of any
+individual system's configuration.
+
+**EigenTrust** (`EigenTrustComputer`) propagates trust transitively through the mesh via power
+iteration — the same algorithm used in peer-to-peer reputation systems (Kamvar et al., 2003).
+If agent A has attested positively to B's decisions, and B has attested positively to C's, then
+A has a derived signal about C even without direct interaction. The result is a global trust share
+for every actor in the mesh: a single number in [0.0, 1.0] that reflects the actor's standing
+across the entire observed network of peer reviews, not just its direct relationships. New agents
+entering the mesh with no attestation history receive a uniform prior; their score shifts as
+peers observe and attest to their decisions.
+
+**Discovery provenance** ties this to participant registration. CaseHub has adopted the same
+four-layer framework for worker registration (ADR-0006): a worker's registration is a normative
+act — a speech act that constitutively creates a participant with deontic consequences. The
+engine incurs an obligation to consider the worker for capable work; the worker incurs an
+obligation to accept work within its declared capabilities or decline with reason. The discovery
+lineage of how a worker came to be known — statically declared, provisioned, self-announced, or
+introduced by another participant — is recorded using the same `causedByEntryId` causal chain as
+obligation lineage in Qhorus. Trust derives from this chain: a worker introduced by a
+provisioner whose EigenTrust score is high inherits a correspondingly stronger initial deontic
+standing than one that self-announced without a voucher.
+
+The result: in a system built on the normative layer, **who to trust is derived from the
+immutable record of what agents have done**, not from configuration that someone set up once and
+forgot. Trust accretes from behaviour. It propagates through peer relationships. It is anchored
+to the causal chain of how agents came to exist. And it is queryable — the same ledger tools
+that surface obligation health surface trust scores.
+
 ### The core shift
 
-In a system without the normative layer, obligations exist only in the orchestrator's head — usually encoded as workflow state, hard to query, impossible to audit, and meaningless across agent boundaries. With the normative layer, obligations are first-class infrastructure. They are created, tracked, transferred, and resolved by the mesh — not by the LLM. **The LLM reasons; the infrastructure enforces.** That separation is what makes enterprise-grade agentic systems possible.
+In a system without the normative layer, obligations exist only in the orchestrator's head —
+usually encoded as workflow state, hard to query, impossible to audit, and meaningless across
+agent boundaries. With the normative layer, obligations are first-class infrastructure. They are
+created, tracked, transferred, and resolved by the mesh — not by the LLM. Trust is derived from
+observable behaviour, propagated through peer attestation, and anchored to tamper-evident
+records. Participant provenance is a causal chain, not a configuration file. **The LLM reasons;
+the infrastructure enforces, records, and derives.** That separation is what makes
+enterprise-grade agentic systems possible.
 
 ---
 
