@@ -2,6 +2,7 @@ package io.quarkiverse.qhorus.runtime.message;
 
 import io.quarkiverse.qhorus.runtime.channel.Channel;
 
+@FunctionalInterface
 public interface MessageTypePolicy {
 
     /**
