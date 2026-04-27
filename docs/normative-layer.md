@@ -2,6 +2,38 @@
 
 ## What It Is and Why It Matters for Enterprise Agentic-AI
 
+**Capability without accountability is not progress — it is liability in waiting.**
+
+As AI agents take on consequential roles in the world — approving claims, processing payments,
+filing regulatory reports, routing financial decisions — a second question matters as much as
+whether they can perform the task: *can we prove what each agent committed to, to whom, under
+what authorisation, and what happened when they failed to deliver?* Human institutions spent
+centuries developing the infrastructure to answer that question: contracts, audits, professional
+accountability frameworks, clearing houses, regulatory reporting. Multi-agent AI has built
+remarkable capability while leaving that infrastructure entirely absent.
+
+This is not a logging problem. Logs record events; they do not capture commitments. This is not
+a workflow orchestration problem; orchestration tracks procedural steps, not deontic obligations
+between autonomous agents. This is not a model quality problem; even perfectly-reasoning agents
+operating without formal accountability infrastructure cannot produce the evidence that regulated
+environments require.
+
+The normative layer is the accountability infrastructure that multi-agent AI has been missing.
+Grounded in thirty years of research at the intersection of speech act theory, deontic logic,
+defeasible reasoning, and social commitment semantics — and now implemented as practical,
+developer-facing infrastructure — it gives every agent interaction the formal status of an
+accountable act: recorded, tracked, causally linked, tamper-evidently proven, and queryable by
+the agents themselves at runtime.
+
+**For business owners and compliance officers, the significance is not the technology — it is
+the methodology.** The normative layer provides a formally-grounded governance framework for AI
+that maps directly to the questions regulators, auditors, and boards already ask: what was
+authorised, by whom, what obligations were created, what evidence exists, and who is accountable
+when something goes wrong. This is not another layer added to the middleware stack. It is the
+foundation that determines whether AI agents can operate legitimately in regulated environments —
+and the methodology that gives organisations a defensible, auditable answer when accountability
+is demanded. That answer cannot be retrofitted. It has to be built in from the start.
+
 ---
 
 ## The Four Layers
