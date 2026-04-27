@@ -11,6 +11,8 @@ Qhorus is the Quarkus Native port of [cross-claude-mcp](https://github.com/rblan
 
 It solves a specific problem that no other system solves: **N agents collaborating on named channels without knowing each other's addresses, waiting for whoever responds, sharing large artefacts by reference, and being observable by humans in real time.**
 
+More precisely: Qhorus is a **governance methodology** for multi-agent AI, not middleware. It gives every agent interaction the formal status of an accountable act — grounded in thirty years of research in speech act theory, deontic logic, defeasible reasoning, and social commitment semantics — and exposes that methodology as a developer-facing API. The LLM reasons; the infrastructure enforces, records, and derives. For the full methodology framing and business positioning, see `docs/normative-layer.md`.
+
 It is one component of the Quarkus Native AI Agent Ecosystem alongside CaseHub (orchestration) and Claudony (terminal management). The canonical ecosystem design document lives in Claudony at `~/claude/claudony/docs/superpowers/specs/2026-04-13-quarkus-ai-ecosystem-design.md`. Qhorus has no dependency on either other project — it is independently useful and deployable.
 
 ---
@@ -277,6 +279,36 @@ Response fields: `sequence_number`, `message_type`, `entry_type`, `actor_id`, `t
 `content`, `correlation_id`, `commitment_id`, `caused_by_entry_id`, `occurred_at`,
 `message_id`, plus telemetry fields when present (`tool_name`, `duration_ms`, etc.).
 
+### Trust Layer — Attestations and Derived Trust Scores
+
+The normative ledger is also the substrate for agent trust. quarkus-ledger provides two
+complementary trust models, both derived from the immutable ledger record of peer reviews:
+
+**Attestations** (`LedgerAttestation`) are peer review verdicts stamped onto ledger entries.
+When an agent reviews another's decision, it records a verdict — `SOUND`, `ENDORSED`,
+`FLAGGED`, or `CHALLENGED` — with evidence text and a confidence score. Attestations are
+immutable records in the same tamper-evident ledger as obligations.
+
+**Bayesian Beta trust scoring** (`ActorTrustScore`) computes a per-actor trust score from
+direct attestation history. Alpha accumulates positive evidence; beta accumulates negative.
+The score narrows as more peers attest. It is a property of the ledger record, not of
+configuration.
+
+**EigenTrust** (`EigenTrustComputer`) propagates trust transitively via power iteration
+(Kamvar et al., 2003). If agent A attests positively to B's decisions, and B attests
+positively to C's, A has a derived signal about C. The result is a global trust share for
+every actor — a single number in [0.0, 1.0] reflecting standing across the entire observed
+peer review network.
+
+**Discovery provenance** extends this to participant registration. CaseHub applies the same
+framework to worker registration (casehub-engine ADR-0006): a worker's registration is a
+normative act recorded in the ledger via `causedByEntryId`. A worker introduced by a
+high-trust provisioner inherits stronger initial deontic standing via EigenTrust propagation.
+Trust is a causal chain property, not a label.
+
+For the full trust model treatment, see `docs/normative-layer.md` §"Participant trust and
+discovery provenance".
+
 ### Design Decision — Complete Audit Trail
 
 Every message type is recorded (not just EVENT) because:
@@ -290,6 +322,14 @@ Every message type is recorded (not just EVENT) because:
 4. **Single entity**: one `MessageLedgerEntry` table with nullable telemetry fields
    avoids UNION queries. `messageType` is the discriminator; telemetry fields are
    clearly EVENT-only.
+
+### Design Decision — Trust derived from behaviour, not configuration
+
+In most agentic systems, trust is hardcoded or assumed. The normative layer provides a third
+option: trust computed from the immutable ledger record of what agents have done and how
+peers have judged those decisions. Bayesian Beta gives local trust from direct attestation
+history. EigenTrust gives global trust propagated transitively through the peer review
+network. Neither requires a configuration file. Both update continuously as the system runs.
 
 ---
 

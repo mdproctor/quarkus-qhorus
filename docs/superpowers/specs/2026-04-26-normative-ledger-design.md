@@ -338,7 +338,35 @@ After the review pass, add:
 
 ---
 
-## 10. Issue and Epic Structure
+## 10. Subsequent Layer — Trust and Participant Provenance
+
+This spec covers the normative ledger as implemented: all 9 message types recorded,
+`causedByEntryId` causal chains, `list_ledger_entries` MCP tool. The next layer — specced
+in `docs/superpowers/specs/2026-04-26-ledger-query-capabilities-design.md` — adds:
+
+**Trust derived from the ledger record.** quarkus-ledger provides two complementary trust
+models, both computed from `LedgerAttestation` records stamped onto ledger entries by peer
+agents:
+
+- **Bayesian Beta** (`ActorTrustScore`): per-actor trust score from direct attestation
+  history. Alpha/beta parameters narrow as peers endorse or challenge decisions.
+- **EigenTrust** (`EigenTrustComputer`): global trust propagated transitively via power
+  iteration (Kamvar et al., 2003). Trust flows through the peer review network: if A
+  attests positively to B's decisions, and B to C's, A has a derived signal about C.
+
+**Discovery provenance.** CaseHub applies this framework to worker registration
+(casehub-engine ADR-0006): a worker's registration is a normative act recorded in the
+ledger with the same `causedByEntryId` causal chain as obligation lineage here. Trust
+derives from provenance — a worker introduced by a high-trust provisioner inherits stronger
+initial deontic standing.
+
+**Methodology.** The normative ledger is not middleware — it is the persistence layer of a
+governance methodology grounded in thirty years of formal methods research. For the full
+framing, see `docs/normative-layer.md`.
+
+---
+
+## 11. Issue and Epic Structure
 
 All implementation commits reference issues linked to a parent epic. The epic covers the full normative ledger feature. Child issues cover:
 

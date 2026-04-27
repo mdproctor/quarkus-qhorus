@@ -56,6 +56,30 @@ the same `causedByEntryId` causal chain mechanism as obligation lineage in Qhoru
 from this chain: a worker introduced by a trusted provisioner inherits a higher initial deontic
 standing than one that self-announced without a voucher.
 
+**Trust is derived from the same ledger.** The discovery lineage chain does not merely record
+provenance — it feeds the trust models in quarkus-ledger. When peers attest to an agent's
+decisions (`LedgerAttestation`: `SOUND`, `ENDORSED`, `FLAGGED`, `CHALLENGED`), two trust
+scores are computed from those records:
+
+- **Bayesian Beta** (`ActorTrustScore`): per-actor trust from direct attestation history.
+  Alpha accumulates positive evidence; beta accumulates negative. The score narrows as more
+  peers attest and does not require any configuration.
+- **EigenTrust** (`EigenTrustComputer`): global trust propagated transitively via power
+  iteration (Kamvar et al., 2003). Trust flows through the peer review network: if agent A
+  attests positively to B's decisions, and B attests positively to C's, A has a derived
+  signal about C even without direct interaction.
+
+A worker introduced by a provisioner whose EigenTrust global share is high inherits a
+stronger initial deontic standing than one that self-announced. Trust and provenance are
+unified in the same causal chain.
+
+**Methodology, not middleware.** The framework defined in this spec — and implemented by
+Qhorus, quarkus-ledger, and extended by CaseHub — is a governance methodology grounded in
+thirty years of formal methods research. The significance for business owners and compliance
+officers is not the technology; it is that every agent interaction carries the formal status
+of an accountable act: recorded, tracked, causally linked, tamper-evidently proven, and
+queryable. For the full methodology framing, see `docs/normative-layer.md`.
+
 The implication for this spec: when extending the framework to new domains, the four layers apply
 without modification. The framework gains value by being applied consistently — each additional
 domain it governs strengthens the case for it as the shared normative substrate of the ecosystem.
@@ -69,6 +93,7 @@ Section 4.2, not modelled separately.
   normatively by ADR-0006
 - `docs/superpowers/specs/2026-04-26-normative-ledger-design.md` — the ledger infrastructure
   that records both inter-agent and worker-registration normative events
+- `docs/normative-layer.md` — full methodology framing, trust models, and grounded scenario
 
 ---
 
