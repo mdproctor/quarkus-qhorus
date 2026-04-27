@@ -48,7 +48,7 @@ Any Quarkus app adds `io.quarkiverse.qhorus:quarkus-qhorus` as a dependency and 
 - **Instance registry** with capability tags and three addressing modes (by id · by capability · by role)
 - **`wait_for_reply`** long-poll with correlation IDs and SSE keepalives
 - **Agent Cards** at `/.well-known/agent-card.json` for A2A ecosystem discovery
-- **Normative audit ledger** — every message of all 9 types creates a `MessageLedgerEntry` (via `quarkus-ledger`) with SHA-256 tamper evidence. The ledger is the complete, immutable channel history. Queryable via `list_ledger_entries` (with type_filter, sender, correlation_id, sort), `get_obligation_chain`, `get_causal_chain`, `list_stalled_obligations`, `get_obligation_stats`, `get_telemetry_summary`, and `get_channel_timeline`
+- **Normative audit ledger** — every message of all 9 types creates a `MessageLedgerEntry` (via `quarkus-ledger`) with SHA-256 tamper evidence. The ledger is the complete, immutable channel history. Queryable via `list_ledger_entries` (type_filter, sender, correlation_id, sort, after_id, limit — entry_id in output), `get_obligation_chain` (participants + elapsed + resolution), `get_causal_chain` (walk causedByEntryId to root), `list_stalled_obligations`, `get_obligation_stats` (fulfillment rate), `get_telemetry_summary` (per-tool EVENT aggregation), and `get_channel_timeline`
 
 Qhorus is designed to be embedded in Claudony (`~/claude/claudony`) as part of the broader Quarkus Native AI Agent Ecosystem, and eventually submitted to Quarkiverse.
 
@@ -113,14 +113,14 @@ quarkus-qhorus/
 │       │   └── DataService.java
 │       ├── ledger/
 │       │   ├── MessageLedgerEntry.java              — JPA JOINED subclass of LedgerEntry; records all 9 message types
-│       │   ├── MessageLedgerEntryRepository.java    — listEntries (7 filters), findLatestByCorrelationId, causal chain, stalled detection, telemetry aggregation
+│       │   ├── MessageLedgerEntryRepository.java    — listEntries (7 filters + correlationId + sort), findAllByCorrelationId, findAncestorChain, findStalledCommands, countByOutcome, findByActorIdInChannel, findEventsSince; findLatestByCorrelationId for write-time causal chain resolution
 │       │   ├── MessageReactivePanacheRepo.java      — @Alternative reactive Panache repo
 │       │   ├── ReactiveMessageLedgerEntryRepository.java — @Alternative reactive implementation
 │       │   ├── LedgerWriteService.java              — record(Channel, Message): writes entry for ALL 9 types; telemetry extracted from EVENT JSON
 │       │   └── ReactiveLedgerWriteService.java      — @Alternative reactive mirror of LedgerWriteService
 │       ├── mcp/
-│       │   ├── QhorusMcpToolsBase.java  — abstract base: records, mappers (toLedgerEntryMap, toMessageSummary, etc.), validators
-│       │   ├── QhorusMcpTools.java      — blocking @Tool methods (~42); @UnlessBuildProperty(reactive.enabled)
+│       │   ├── QhorusMcpToolsBase.java  — abstract base: records, mappers (toLedgerEntryMap, toMessageSummary, etc.), validators; ledger query response records (ObligationChainSummary, CausalChainEntry, StalledObligation, ObligationStats, TelemetrySummary, ToolTelemetry)
+│       │   ├── QhorusMcpTools.java      — blocking @Tool methods (~47); @UnlessBuildProperty(reactive.enabled)
 │       │   └── ReactiveQhorusMcpTools.java — reactive @Tool methods returning Uni<T>; @IfBuildProperty(reactive.enabled)
 │       ├── watchdog/
 │       │   ├── Watchdog.java            — PanacheEntity (condition-based alert registrations)
@@ -166,6 +166,7 @@ JAVA_HOME=/Library/Java/JavaVirtualMachines/graalvm-25.jdk/Contents/Home \
 
 **Testing conventions:**
 - `@TestTransaction` + RestAssured HTTP calls do NOT share a transaction — injected writes are uncommitted and invisible to the HTTP handler. Avoid `@TestTransaction` on tests that mix injected calls with RestAssured. Use unique names per test for isolation instead.
+- `@TestTransaction` wraps the test METHOD only, not `@BeforeEach`. Any channel/entity created in `@BeforeEach` via `@Transactional` tool methods commits immediately and is visible. However, `LedgerWriteService.record()` uses `REQUIRES_NEW` — ledger entries from prior tests' `@BeforeEach` runs PERSIST after rollback. Always set up channels and send scenario messages inside the `@Test` method body, not in `@BeforeEach`, to avoid stale ledger entries interfering with queries in subsequent tests.
 - For tests requiring concurrent execution (e.g. cancel-while-blocking), use `@Inject ManagedExecutor executor` rather than raw `ExecutorService` — `ManagedExecutor` propagates Quarkus CDI context so `@Transactional` works on background threads.
 - Optional modules (`a2a`, `watchdog`) require a `@TestProfile` that sets `quarkus.qhorus.<module>.enabled=true`. Any `@TestProfile` that causes Quarkus to restart must also include the full `quarkus.datasource.qhorus.*` block (db-kind, jdbc.url, username, password) plus `quarkus.datasource.qhorus.reactive=false` and `quarkus.hibernate-orm.qhorus.database.generation=drop-and-create` in `getConfigOverrides()` — Quarkus restarts do not inherit test `application.properties` from prior context.
 - `RateLimiter` and `ObserverRegistry` are `@ApplicationScoped` in-memory beans — their state does NOT roll back with `@TestTransaction`. Use unique channel names and observer IDs per test to avoid cross-test interference.

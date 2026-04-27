@@ -380,8 +380,13 @@ All tools exposed via the single `/mcp` Streamable HTTP endpoint.
 | `register_observer` | Register an observer to receive EVENT messages on a channel. |
 | `deregister_observer` | Unregister an observer. |
 | `read_observer_events` | Read EVENT messages delivered to a registered observer. |
-| `list_ledger_entries` | Query the immutable audit ledger. Supports `type_filter` (e.g. `COMMAND,DONE,FAILURE`), `sender`, `correlation_id`, `sort` (asc/desc), `after_id`, `limit`. Returns causal chain via `caused_by_entry_id`. |
+| `list_ledger_entries` | Query the immutable audit ledger. Supports `type_filter` (e.g. `COMMAND,DONE,FAILURE`), `sender`, `correlation_id`, `sort` (asc/desc), `after_id`, `limit`. Returns `entry_id` (UUID) and causal chain via `caused_by_entry_id`. |
 | `get_channel_timeline` | Ordered view of all message types on a channel, including EVENT telemetry. |
+| `get_obligation_chain` | Computed enrichment for an obligation (by `correlation_id`): initiator, participants in encounter order, handoff count, elapsed seconds, resolution type, and live CommitmentStore state. Returns null fields (not an error) for unknown correlation IDs. |
+| `get_causal_chain` | Compliance audit tool. Given a `ledger_entry_id` (UUID from `list_ledger_entries`), walks `caused_by_entry_id` links upward to the root. Returns chain ordered oldest-first. Returns empty list for unknown entry IDs. |
+| `list_stalled_obligations` | COMMAND entries with no terminal sibling (DONE / FAILURE / DECLINE / HANDOFF) sharing the same `correlation_id`, older than `older_than_seconds` (default 30). Returns `stalled_for_seconds` per entry. |
+| `get_obligation_stats` | Obligation outcome statistics for a channel: `total_commands`, `fulfilled`, `failed`, `declined`, `delegated`, `still_open`, `stalled`, `fulfillment_rate`. |
+| `get_telemetry_summary` | EVENT telemetry aggregated by tool name: per-tool `count`, `avg_duration_ms`, `total_tokens`; channel-wide `total_events`, `total_tokens`, `total_duration_ms`. Optional `since` (ISO-8601) filter. |
 
 ### Commitments
 
@@ -814,7 +819,7 @@ Storing `reply_count` as a denormalized column trades a small write overhead (in
 | **9 — A2A compat** | Optional A2A endpoint for external orchestrator interop |
 | **10 — Human-in-the-loop controls** | `pause_channel` / `resume_channel`; `request_approval` (agent-callable, blocks until human responds); external cancellation of pending `wait_for_reply`; force-close BARRIER/COLLECT channels; artefact revocation |
 | **11 — Access control and governance** | Per-channel write permissions (declare allowed `instance_id`s or `capability:tag`s); admin role (a designated instance can pause/resume/close channels on behalf of others); rate limiting per channel or per instance; read-only observer mode (subscribe to events without appearing in the instance registry) |
-| **12 — Normative audit ledger** ✓ | All 9 message types recorded as immutable `MessageLedgerEntry` (SHA-256 hash-chained, JPA JOINED inheritance on quarkus-ledger `LedgerEntry`). `list_ledger_entries(channel_name, type_filter, sender, correlation_id, sort, after_id, limit)` query tool; `get_channel_timeline` — ordered view of all message types for a channel. Causal chain via `caused_by_entry_id`. EVENT entries carry telemetry fields (`tool_name`, `duration_ms`, `token_count`). Complete audit trail queryable by type, agent, and time range. |
+| **12 — Normative audit ledger** ✓ | All 9 message types recorded as immutable `MessageLedgerEntry` (SHA-256 hash-chained, JPA JOINED inheritance on quarkus-ledger `LedgerEntry`). Ledger query tools: `list_ledger_entries` (type_filter, sender, correlation_id, sort, after_id, limit, entry_id in output), `get_channel_timeline`, `get_obligation_chain` (participants, handoff count, elapsed, resolution), `get_causal_chain` (walk causedByEntryId to root), `list_stalled_obligations`, `get_obligation_stats` (fulfillment rate per channel), `get_telemetry_summary` (per-tool EVENT aggregation). Causal chain via `caused_by_entry_id`. EVENT entries carry telemetry fields. |
 
 ---
 
