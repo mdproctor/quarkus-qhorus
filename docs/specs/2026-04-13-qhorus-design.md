@@ -179,6 +179,120 @@ graph LR
 
 ---
 
+## Normative Audit Ledger
+
+Every message sent on a channel is permanently recorded as a `MessageLedgerEntry` — an
+immutable, tamper-evident (SHA-256 hash-chained) record extending the quarkus-ledger
+`LedgerEntry` base class via JPA JOINED inheritance.
+
+### Two-Layer Model
+
+| Layer | Component | Purpose |
+|---|---|---|
+| **Live state** | `CommitmentStore` | Current obligation status — queryable, mutable |
+| **Historical record** | Ledger (`MessageLedgerEntry`) | Complete immutable channel history — permanent |
+
+These are complementary. The CommitmentStore answers "what is the current state of
+obligation X?"; the ledger answers "what has happened in this channel, in order, permanently?"
+
+### What Gets Recorded
+
+All 9 message types produce a ledger entry when sent via `send_message`:
+
+| Message Type | `entryType` | Causal link set? | Notes |
+|---|---|---|---|
+| QUERY | COMMAND | No | Information request — declared intent |
+| COMMAND | COMMAND | No | Action request — creates obligation |
+| RESPONSE | EVENT | No | Answers a QUERY |
+| STATUS | EVENT | No | Progress update |
+| DECLINE | EVENT | Yes → COMMAND | Obligation refused |
+| HANDOFF | COMMAND | Yes → COMMAND | Obligation transferred |
+| DONE | EVENT | Yes → COMMAND/HANDOFF | Obligation completed |
+| FAILURE | EVENT | Yes → COMMAND/HANDOFF | Obligation failed |
+| EVENT | EVENT | No | Tool telemetry — see below |
+
+`entryType` (from quarkus-ledger `LedgerEntryType`) is a coarse classification. All
+Qhorus-level filtering uses `messageType` (the full 9-type name).
+
+### Causal Chain
+
+DONE, FAILURE, DECLINE, and HANDOFF entries have `causedByEntryId` set to the most
+recent COMMAND or HANDOFF entry sharing the same `correlationId` on the same channel.
+This creates a traversable obligation chain inside the ledger itself:
+
+```
+seq=1  COMMAND   "Generate compliance report"   causedByEntryId=null
+seq=2  STATUS    "Processing…"                  causedByEntryId=null
+seq=3  DONE      "Report delivered"             causedByEntryId=<id of seq=1>
+```
+
+For delegation:
+```
+seq=1  COMMAND   "Audit accounts"               causedByEntryId=null
+seq=2  HANDOFF   → agent-c                      causedByEntryId=<id of seq=1>
+seq=3  DONE      "Audit complete"               causedByEntryId=<id of seq=2>
+```
+
+Use `list_ledger_entries` with `type_filter=COMMAND,DONE,FAILURE,DECLINE,HANDOFF` to
+retrieve the obligation lifecycle. Use `caused_by_entry_id` in the response to trace
+the chain.
+
+### EVENT Telemetry
+
+EVENT entries carry additional fields extracted from the JSON payload:
+
+| Field | Required | Description |
+|---|---|---|
+| `tool_name` | No | Agent tool that was invoked |
+| `duration_ms` | No | Wall-clock duration in milliseconds |
+| `token_count` | No | LLM token count |
+| `context_refs` | No | JSON array of context references |
+| `source_entity` | No | JSON object — source domain entity |
+
+Malformed or partial EVENT payloads still produce a ledger entry — the speech act
+happened regardless of telemetry quality. Telemetry fields are null when absent.
+
+### Querying the Ledger
+
+Use `list_ledger_entries`:
+
+```
+# Full channel history
+list_ledger_entries(channel_name="my-channel")
+
+# Obligation lifecycle only
+list_ledger_entries(channel_name="my-channel", type_filter="COMMAND,DONE,FAILURE,DECLINE,HANDOFF")
+
+# Telemetry only
+list_ledger_entries(channel_name="my-channel", type_filter="EVENT")
+
+# One agent's actions
+list_ledger_entries(channel_name="my-channel", agent_id="orchestrator")
+
+# Paginate
+list_ledger_entries(channel_name="my-channel", after_id=15, limit=20)
+```
+
+Response fields: `sequence_number`, `message_type`, `entry_type`, `actor_id`, `target`,
+`content`, `correlation_id`, `commitment_id`, `caused_by_entry_id`, `occurred_at`,
+`message_id`, plus telemetry fields when present (`tool_name`, `duration_ms`, etc.).
+
+### Design Decision — Complete Audit Trail
+
+Every message type is recorded (not just EVENT) because:
+
+1. **Accountability**: which agent issued which COMMAND, which agent declined, which
+   succeeded — must be permanently attributable.
+2. **Compliance**: obligation chains (COMMAND → DONE/FAILURE) are the audit evidence
+   for automated actions, not just telemetry.
+3. **Simplicity**: unconditional recording in the caller (`send_message`) eliminates
+   conditional logic and the risk of accidentally omitting a type.
+4. **Single entity**: one `MessageLedgerEntry` table with nullable telemetry fields
+   avoids UNION queries. `messageType` is the discriminator; telemetry fields are
+   clearly EVENT-only.
+
+---
+
 ## MCP Tool Surface
 
 All tools exposed via the single `/mcp` Streamable HTTP endpoint.
