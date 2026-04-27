@@ -232,6 +232,73 @@ public abstract class QhorusMcpToolsBase {
             String message) {
     }
 
+    // ── Ledger query response records (Epic #110) ─────────────────────────────
+
+    /**
+     * Computed enrichment for an obligation identified by a {@code correlationId}.
+     * Raw entries are available via {@code list_ledger_entries(correlation_id=X)}.
+     */
+    public record ObligationChainSummary(
+            String correlationId,
+            String initiator,
+            String createdAt,
+            String resolvedAt,
+            Long elapsedSeconds,
+            /** MessageType of the terminal entry: DONE, FAILURE, DECLINE, or HANDOFF. Null if open. */
+            String resolution,
+            List<String> participants,
+            int handoffCount,
+            /** Live CommitmentStore state. Null if no matching Commitment exists. */
+            CommitmentDetail commitment) {
+    }
+
+    /** One entry in a causal chain returned by {@code get_causal_chain}. */
+    public record CausalChainEntry(
+            String entryId,
+            String messageType,
+            String actorId,
+            String correlationId,
+            String occurredAt,
+            /** Null for the root entry. */
+            String causedByEntryId) {
+    }
+
+    /** A COMMAND entry with no terminal sibling, older than the stale threshold. */
+    public record StalledObligation(
+            String correlationId,
+            String actorId,
+            String content,
+            String occurredAt,
+            long stalledForSeconds) {
+    }
+
+    /** Obligation outcome statistics for a channel. */
+    public record ObligationStats(
+            int totalCommands,
+            int fulfilled,
+            int failed,
+            int declined,
+            int delegated,
+            int stillOpen,
+            int stalled,
+            double fulfillmentRate) {
+    }
+
+    /** Per-tool telemetry aggregation used inside {@link TelemetrySummary}. */
+    public record ToolTelemetry(
+            int count,
+            long avgDurationMs,
+            long totalTokens) {
+    }
+
+    /** Telemetry summary returned by {@code get_telemetry_summary}. */
+    public record TelemetrySummary(
+            int totalEvents,
+            Map<String, ToolTelemetry> byTool,
+            long totalTokens,
+            long totalDurationMs) {
+    }
+
     public record ChannelDigest(
             String channelName,
             String semantic,
@@ -373,6 +440,7 @@ public abstract class QhorusMcpToolsBase {
 
     protected Map<String, Object> toLedgerEntryMap(final MessageLedgerEntry e) {
         final Map<String, Object> m = new java.util.LinkedHashMap<>();
+        m.put("entry_id", e.id != null ? e.id.toString() : null);
         m.put("sequence_number", (long) e.sequenceNumber);
         m.put("message_type", e.messageType);
         m.put("entry_type", e.entryType != null ? e.entryType.name() : null);

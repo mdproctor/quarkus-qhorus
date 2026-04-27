@@ -28,6 +28,12 @@ import io.quarkiverse.qhorus.runtime.instance.InstanceService;
 import io.quarkiverse.qhorus.runtime.ledger.LedgerWriteService;
 import io.quarkiverse.qhorus.runtime.ledger.MessageLedgerEntry;
 import io.quarkiverse.qhorus.runtime.ledger.MessageLedgerEntryRepository;
+import io.quarkiverse.qhorus.runtime.mcp.QhorusMcpToolsBase.CausalChainEntry;
+import io.quarkiverse.qhorus.runtime.mcp.QhorusMcpToolsBase.ObligationChainSummary;
+import io.quarkiverse.qhorus.runtime.mcp.QhorusMcpToolsBase.ObligationStats;
+import io.quarkiverse.qhorus.runtime.mcp.QhorusMcpToolsBase.StalledObligation;
+import io.quarkiverse.qhorus.runtime.mcp.QhorusMcpToolsBase.TelemetrySummary;
+import io.quarkiverse.qhorus.runtime.mcp.QhorusMcpToolsBase.ToolTelemetry;
 import io.quarkiverse.qhorus.runtime.message.Commitment;
 import io.quarkiverse.qhorus.runtime.message.CommitmentState;
 import io.quarkiverse.qhorus.runtime.message.Message;
@@ -1278,11 +1284,19 @@ public class QhorusMcpTools extends QhorusMcpToolsBase {
     // Ledger audit trail tools
     // ---------------------------------------------------------------------------
 
+    /** Backward-compat overload — no correlation_id or sort. Used by existing tests. */
+    public List<Map<String, Object>> listLedgerEntries(String channelName, String typeFilter,
+            String agentId, String since, Long afterId, int limit) {
+        return listLedgerEntries(channelName, typeFilter, agentId, since, afterId,
+                null, null, limit);
+    }
+
     @Tool(name = "list_ledger_entries", description = "Query the immutable audit ledger for a channel. "
             + "Returns all ledger entries in chronological order — every speech act, every tool invocation. "
             + "Use type_filter to narrow by message type: 'COMMAND,DONE,FAILURE' for obligation lifecycle, "
             + "'EVENT' for telemetry only, omit for the full channel history. "
-            + "Supports optional filters for sender, since (ISO-8601), and cursor-based pagination via after_id.")
+            + "Supports optional filters for sender, since (ISO-8601), correlation_id, sort (asc/desc), "
+            + "and cursor-based pagination via after_id.")
     @Transactional
     public List<Map<String, Object>> listLedgerEntries(
             @ToolArg(name = "channel_name", description = "Name of the channel to query") String channelName,
@@ -1291,6 +1305,8 @@ public class QhorusMcpTools extends QhorusMcpToolsBase {
             @ToolArg(name = "sender", description = "Filter by sender — returns only entries from this agent", required = false) String agentId,
             @ToolArg(name = "since", description = "ISO-8601 timestamp — return only entries at or after this time", required = false) String since,
             @ToolArg(name = "after_id", description = "Return entries with sequence_number > after_id (cursor pagination)", required = false) Long afterId,
+            @ToolArg(name = "correlation_id", description = "Filter by correlation ID — returns only entries for this obligation", required = false) String correlationId,
+            @ToolArg(name = "sort", description = "Sort order: 'asc' (default, oldest first) or 'desc' (newest first)", required = false) String sort,
             @ToolArg(name = "limit", description = "Maximum entries to return (default 20, max 100)", required = false) Integer limit) {
 
         final Channel ch = channelService.findByName(channelName)
@@ -1316,10 +1332,218 @@ public class QhorusMcpTools extends QhorusMcpToolsBase {
             }
         }
 
+        final boolean sortDesc;
+        if (sort == null || sort.isBlank() || "asc".equalsIgnoreCase(sort)) {
+            sortDesc = false;
+        } else if ("desc".equalsIgnoreCase(sort)) {
+            sortDesc = true;
+        } else {
+            throw new IllegalArgumentException(
+                    "Invalid sort value '" + sort + "' — use 'asc' or 'desc'");
+        }
+
         final List<MessageLedgerEntry> entries = ledgerRepo.listEntries(
-                ch.id, types, afterId, agentId, sinceInstant, effectiveLimit);
+                ch.id, types, afterId, agentId, sinceInstant, correlationId, sortDesc, effectiveLimit);
 
         return entries.stream().map(this::toLedgerEntryMap).toList();
+    }
+
+    @Tool(name = "get_obligation_chain", description = "Return computed enrichment for an obligation identified by correlation_id: "
+            + "initiator, participants, handoff count, elapsed time, resolution, and live commitment state. "
+            + "For raw ledger entries use list_ledger_entries(correlation_id=X). "
+            + "Returns null fields (not an error) for unknown correlation IDs.")
+    @Transactional
+    public ObligationChainSummary getObligationChain(
+            @ToolArg(name = "channel_name", description = "Name of the channel") String channelName,
+            @ToolArg(name = "correlation_id", description = "Correlation ID of the obligation to inspect") String correlationId) {
+
+        final Channel ch = channelService.findByName(channelName)
+                .orElseThrow(() -> new IllegalArgumentException("Channel not found: " + channelName));
+
+        final List<MessageLedgerEntry> chain = ledgerRepo.findAllByCorrelationId(ch.id, correlationId);
+
+        if (chain.isEmpty()) {
+            return new ObligationChainSummary(correlationId, null, null, null, null, null,
+                    List.of(), 0, null);
+        }
+
+        final MessageLedgerEntry first = chain.get(0);
+        final String initiator = first.actorId;
+        final String createdAt = first.occurredAt != null ? first.occurredAt.toString() : null;
+
+        // Terminal entry: first DONE / FAILURE / DECLINE (not HANDOFF — that is delegated, not resolved)
+        final java.util.Set<String> terminal = java.util.Set.of("DONE", "FAILURE", "DECLINE");
+        final MessageLedgerEntry terminalEntry = chain.stream()
+                .filter(e -> terminal.contains(e.messageType))
+                .findFirst()
+                .orElse(null);
+
+        final String resolution = terminalEntry != null ? terminalEntry.messageType : null;
+        final String resolvedAt = (terminalEntry != null && terminalEntry.occurredAt != null)
+                ? terminalEntry.occurredAt.toString()
+                : null;
+        final Long elapsedSeconds = (terminalEntry != null && first.occurredAt != null
+                && terminalEntry.occurredAt != null)
+                        ? terminalEntry.occurredAt.getEpochSecond() - first.occurredAt.getEpochSecond()
+                        : null;
+
+        // Participants — unique actorIds in encounter order
+        final List<String> participants = chain.stream()
+                .map(e -> e.actorId)
+                .distinct()
+                .collect(java.util.stream.Collectors.toList());
+
+        final int handoffCount = (int) chain.stream()
+                .filter(e -> "HANDOFF".equals(e.messageType))
+                .count();
+
+        final CommitmentDetail commitment = commitmentStore.findByCorrelationId(correlationId)
+                .map(CommitmentDetail::from)
+                .orElse(null);
+
+        return new ObligationChainSummary(correlationId, initiator, createdAt, resolvedAt,
+                elapsedSeconds, resolution, participants, handoffCount, commitment);
+    }
+
+    @Tool(name = "get_causal_chain", description = "Compliance and audit tool. Takes a ledger_entry_id (UUID from list_ledger_entries) "
+            + "and walks causedByEntryId links upward to the root. "
+            + "Returns the chain ordered oldest-first. "
+            + "Returns empty list for unknown entry IDs (never throws on missing chain).")
+    @Transactional
+    public List<CausalChainEntry> getCausalChain(
+            @ToolArg(name = "channel_name", description = "Name of the channel") String channelName,
+            @ToolArg(name = "ledger_entry_id", description = "UUID of the ledger entry (from list_ledger_entries entry_id field)") String ledgerEntryId) {
+
+        final Channel ch = channelService.findByName(channelName)
+                .orElseThrow(() -> new IllegalArgumentException("Channel not found: " + channelName));
+
+        final UUID entryUuid;
+        try {
+            entryUuid = UUID.fromString(ledgerEntryId);
+        } catch (final IllegalArgumentException e) {
+            throw new IllegalArgumentException(
+                    "Invalid ledger_entry_id '" + ledgerEntryId + "' — must be a UUID");
+        }
+
+        return ledgerRepo.findAncestorChain(ch.id, entryUuid).stream()
+                .map(e -> new CausalChainEntry(
+                        e.id != null ? e.id.toString() : null,
+                        e.messageType,
+                        e.actorId,
+                        e.correlationId,
+                        e.occurredAt != null ? e.occurredAt.toString() : null,
+                        e.causedByEntryId != null ? e.causedByEntryId.toString() : null))
+                .toList();
+    }
+
+    @Tool(name = "list_stalled_obligations", description = "Return COMMAND entries with no terminal sibling "
+            + "(DONE / FAILURE / DECLINE / HANDOFF) sharing the same correlation_id, "
+            + "whose timestamp is older than the given threshold. "
+            + "Useful for detecting obligations that an obligor has not responded to.")
+    @Transactional
+    public List<StalledObligation> listStalledObligations(
+            @ToolArg(name = "channel_name", description = "Name of the channel to query") String channelName,
+            @ToolArg(name = "older_than_seconds", description = "Minimum age in seconds to consider stalled (default 30)", required = false) Integer olderThanSeconds) {
+
+        final Channel ch = channelService.findByName(channelName)
+                .orElseThrow(() -> new IllegalArgumentException("Channel not found: " + channelName));
+
+        final int threshold = olderThanSeconds != null ? olderThanSeconds : 30;
+        final java.time.Instant cutoff = java.time.Instant.now().minusSeconds(threshold);
+        final java.time.Instant now = java.time.Instant.now();
+
+        return ledgerRepo.findStalledCommands(ch.id, cutoff).stream()
+                .map(e -> {
+                    final long stalledFor = e.occurredAt != null
+                            ? now.getEpochSecond() - e.occurredAt.getEpochSecond()
+                            : 0L;
+                    return new StalledObligation(
+                            e.correlationId,
+                            e.actorId,
+                            e.content,
+                            e.occurredAt != null ? e.occurredAt.toString() : null,
+                            stalledFor);
+                })
+                .toList();
+    }
+
+    @Tool(name = "get_obligation_stats", description = "Return obligation outcome statistics for a channel: "
+            + "total commands, fulfilled, failed, declined, delegated, still open, stalled, and fulfillment rate. "
+            + "'Still open' = commands with no terminal outcome. "
+            + "'Stalled' = subset of still-open whose timestamp is older than 30 seconds.")
+    @Transactional
+    public ObligationStats getObligationStats(
+            @ToolArg(name = "channel_name", description = "Name of the channel to query") String channelName) {
+
+        final Channel ch = channelService.findByName(channelName)
+                .orElseThrow(() -> new IllegalArgumentException("Channel not found: " + channelName));
+
+        final Map<String, Long> counts = ledgerRepo.countByOutcome(ch.id);
+        final long total = counts.getOrDefault("COMMAND", 0L);
+        final long fulfilled = counts.getOrDefault("DONE", 0L);
+        final long failed = counts.getOrDefault("FAILURE", 0L);
+        final long declined = counts.getOrDefault("DECLINE", 0L);
+        final long delegated = counts.getOrDefault("HANDOFF", 0L);
+        final long stillOpen = Math.max(0L, total - fulfilled - failed - declined - delegated);
+        final long stalled = ledgerRepo
+                .findStalledCommands(ch.id, java.time.Instant.now().minusSeconds(30))
+                .size();
+        final double rate = total > 0 ? (double) fulfilled / total : 0.0;
+
+        return new ObligationStats((int) total, (int) fulfilled, (int) failed, (int) declined,
+                (int) delegated, (int) stillOpen, (int) stalled, rate);
+    }
+
+    @Tool(name = "get_telemetry_summary", description = "Aggregate EVENT telemetry for a channel, grouped by tool name. "
+            + "Returns total event count, per-tool counts with average duration and total tokens, "
+            + "and channel-wide totals. EVENT entries with no tool_name are counted under a null key. "
+            + "Optional since parameter (ISO-8601) to restrict the time window.")
+    @Transactional
+    public TelemetrySummary getTelemetrySummary(
+            @ToolArg(name = "channel_name", description = "Name of the channel to query") String channelName,
+            @ToolArg(name = "since", description = "ISO-8601 timestamp — include only events at or after this time", required = false) String since) {
+
+        final Channel ch = channelService.findByName(channelName)
+                .orElseThrow(() -> new IllegalArgumentException("Channel not found: " + channelName));
+
+        java.time.Instant sinceInstant = null;
+        if (since != null && !since.isBlank()) {
+            try {
+                sinceInstant = java.time.Instant.parse(since);
+            } catch (final java.time.format.DateTimeParseException e) {
+                throw new IllegalArgumentException(
+                        "Invalid 'since' timestamp '" + since + "' — use ISO-8601 format");
+            }
+        }
+
+        final List<MessageLedgerEntry> events = ledgerRepo.findEventsSince(ch.id, sinceInstant);
+
+        if (events.isEmpty()) {
+            return new TelemetrySummary(0, Map.of(), 0L, 0L);
+        }
+
+        // Aggregate per tool (null toolName is a valid key)
+        final java.util.LinkedHashMap<String, long[]> agg = new java.util.LinkedHashMap<>();
+        for (final MessageLedgerEntry e : events) {
+            final long[] acc = agg.computeIfAbsent(e.toolName, k -> new long[3]);
+            acc[0]++; // count
+            acc[1] += e.durationMs != null ? e.durationMs : 0; // total duration
+            acc[2] += e.tokenCount != null ? e.tokenCount : 0; // total tokens
+        }
+
+        final Map<String, ToolTelemetry> byTool = new java.util.LinkedHashMap<>();
+        for (final var entry : agg.entrySet()) {
+            final long[] acc = entry.getValue();
+            byTool.put(entry.getKey(),
+                    new ToolTelemetry((int) acc[0], acc[0] > 0 ? acc[1] / acc[0] : 0L, acc[2]));
+        }
+
+        final long totalTokens = events.stream()
+                .mapToLong(e -> e.tokenCount != null ? e.tokenCount : 0L).sum();
+        final long totalDuration = events.stream()
+                .mapToLong(e -> e.durationMs != null ? e.durationMs : 0L).sum();
+
+        return new TelemetrySummary(events.size(), byTool, totalTokens, totalDuration);
     }
 
     @Tool(name = "get_channel_timeline", description = "Return all messages for a channel in chronological order, "
