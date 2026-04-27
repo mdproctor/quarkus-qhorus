@@ -39,6 +39,7 @@ import io.quarkiverse.qhorus.runtime.message.CommitmentState;
 import io.quarkiverse.qhorus.runtime.message.Message;
 import io.quarkiverse.qhorus.runtime.message.MessageService;
 import io.quarkiverse.qhorus.runtime.message.MessageType;
+import io.quarkiverse.qhorus.runtime.message.MessageTypePolicy;
 import io.quarkiverse.qhorus.runtime.store.CommitmentStore;
 import io.quarkiverse.qhorus.runtime.store.MessageStore;
 import io.quarkiverse.qhorus.runtime.store.query.MessageQuery;
@@ -92,6 +93,9 @@ public class QhorusMcpTools extends QhorusMcpToolsBase {
 
     @Inject
     CommitmentStore commitmentStore;
+
+    @Inject
+    MessageTypePolicy messageTypePolicy;
 
     // ---------------------------------------------------------------------------
     // Instance management tools
@@ -224,24 +228,34 @@ public class QhorusMcpTools extends QhorusMcpToolsBase {
 
     /** Convenience overload — no ACL or rate limits. Used by tests and internal callers. */
     public ChannelDetail createChannel(String name, String description, String semantic, String barrierContributors) {
-        return createChannel(name, description, semantic, barrierContributors, null, null, null, null);
+        return createChannel(name, description, semantic, barrierContributors, null, null, null, null, null);
     }
 
     /** Convenience overload — allowed_writers but no admin_instances or rate limits. */
     public ChannelDetail createChannel(String name, String description, String semantic, String barrierContributors,
             String allowedWriters) {
-        return createChannel(name, description, semantic, barrierContributors, allowedWriters, null, null, null);
+        return createChannel(name, description, semantic, barrierContributors, allowedWriters, null, null, null, null);
     }
 
     /** Convenience overload — allowed_writers and admin_instances but no rate limits. */
     public ChannelDetail createChannel(String name, String description, String semantic, String barrierContributors,
             String allowedWriters, String adminInstances) {
         return createChannel(name, description, semantic, barrierContributors, allowedWriters, adminInstances, null,
-                null);
+                null, null);
+    }
+
+    /** Convenience overload — full 8-param (rate limits) but no allowed_types. Backward compatibility for tests. */
+    public ChannelDetail createChannel(String name, String description, String semantic, String barrierContributors,
+            String allowedWriters, String adminInstances, Integer rateLimitPerChannel, Integer rateLimitPerInstance) {
+        return createChannel(name, description, semantic, barrierContributors, allowedWriters, adminInstances,
+                rateLimitPerChannel, rateLimitPerInstance, null);
     }
 
     @Tool(name = "create_channel", description = "Create a named channel with declared semantic. "
-            + "Semantic defaults to APPEND if not specified.")
+            + "Semantic defaults to APPEND if not specified. "
+            + "Use allowed_types to restrict which MessageType values may be sent to this channel "
+            + "(enforced at both MCP and service layers). Example: \"EVENT\" for a telemetry-only observe channel; "
+            + "\"QUERY,COMMAND\" for a governance channel.")
     @Transactional
     public ChannelDetail createChannel(
             @ToolArg(name = "name", description = "Unique channel name") String name,
@@ -251,7 +265,8 @@ public class QhorusMcpTools extends QhorusMcpToolsBase {
             @ToolArg(name = "allowed_writers", description = "Comma-separated allowed writers: bare instance IDs and/or capability:tag / role:name patterns. Null = open to all.", required = false) String allowedWriters,
             @ToolArg(name = "admin_instances", description = "Comma-separated instance IDs permitted to manage this channel (pause/resume/force_release/clear). Null = open to any caller.", required = false) String adminInstances,
             @ToolArg(name = "rate_limit_per_channel", description = "Max messages per minute across all senders. Null = unlimited.", required = false) Integer rateLimitPerChannel,
-            @ToolArg(name = "rate_limit_per_instance", description = "Max messages per minute from a single sender. Null = unlimited.", required = false) Integer rateLimitPerInstance) {
+            @ToolArg(name = "rate_limit_per_instance", description = "Max messages per minute from a single sender. Null = unlimited.", required = false) Integer rateLimitPerInstance,
+            @ToolArg(name = "allowed_types", description = "Comma-separated MessageType names permitted on this channel. Null = all types permitted. Example: \"EVENT\" for a telemetry-only observe channel; \"QUERY,COMMAND\" for a governance channel.", required = false) String allowedTypes) {
         ChannelSemantic sem;
         if (semantic == null || semantic.isBlank()) {
             sem = ChannelSemantic.APPEND;
@@ -264,7 +279,7 @@ public class QhorusMcpTools extends QhorusMcpToolsBase {
             }
         }
         Channel ch = channelService.create(name, description, sem, barrierContributors, allowedWriters, adminInstances,
-                rateLimitPerChannel, rateLimitPerInstance);
+                rateLimitPerChannel, rateLimitPerInstance, allowedTypes);
         return toChannelDetail(ch, 0L);
     }
 
@@ -470,6 +485,9 @@ public class QhorusMcpTools extends QhorusMcpToolsBase {
             throw new IllegalArgumentException(
                     "HANDOFF requires a non-null target (instance:id, capability:tag, or role:name).");
         }
+
+        // Type policy — client-side enforcement (MessageService enforces server-side too)
+        messageTypePolicy.validate(ch, msgType);
 
         // ACL check — EVENT messages bypass (telemetry always flows)
         if (msgType != MessageType.EVENT && !isAllowedWriter(sender, ch.allowedWriters,
