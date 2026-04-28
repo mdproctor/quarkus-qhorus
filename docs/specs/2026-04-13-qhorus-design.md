@@ -144,6 +144,28 @@ sequenceDiagram
     Note over CH: COLLECT channel clears after delivery
 ```
 
+### InstanceActorIdProvider (#124)
+
+Maps a Qhorus `instanceId` (session-scoped, e.g. `claudony-worker-abc`) to a ledger `actorId`
+(persona-scoped, e.g. `claude:analyst@v1`). Called in `LedgerWriteService.record()` before
+writing `entry.actorId`. Default (`DefaultInstanceActorIdProvider`): identity — returns instanceId
+unchanged. Claudony provides a real mapping from `SessionRegistry`.
+
+### CommitmentAttestationPolicy (#123)
+
+Determines what `LedgerAttestation` to write when DONE/FAILURE/DECLINE discharges a commitment.
+Default (`StoredCommitmentAttestationPolicy`): DONE→SOUND/0.7, FAILURE→FLAGGED/0.6, DECLINE→FLAGGED/0.4
+(configurable via `quarkus.qhorus.attestation.*`). `CommitmentStore` is NOT queried — verdict derived
+from `MessageType` directly to avoid a transaction-visibility bug (outer tx commitment update not yet
+committed inside REQUIRES_NEW). Confidence feeds `recencyWeight × confidence` in quarkus-ledger's
+Bayesian Beta trust score.
+
+```
+quarkus.qhorus.attestation.done-confidence=0.7     # SOUND attestation confidence on DONE
+quarkus.qhorus.attestation.failure-confidence=0.6  # FLAGGED attestation confidence on FAILURE
+quarkus.qhorus.attestation.decline-confidence=0.4  # FLAGGED attestation confidence on DECLINE
+```
+
 ---
 
 ## Message Type Taxonomy
@@ -834,6 +856,7 @@ Storing `reply_count` as a denormalized column trades a small write overhead (in
 | **11 — Access control and governance** | Per-channel write permissions (declare allowed `instance_id`s or `capability:tag`s); admin role (a designated instance can pause/resume/close channels on behalf of others); rate limiting per channel or per instance; read-only observer mode (subscribe to events without appearing in the instance registry) |
 | **12 — Normative audit ledger** ✓ | All 9 message types recorded as immutable `MessageLedgerEntry` (SHA-256 hash-chained, JPA JOINED inheritance on quarkus-ledger `LedgerEntry`). Ledger query tools: `list_ledger_entries` (type_filter, sender, correlation_id, sort, after_id, limit, entry_id in output), `get_channel_timeline`, `get_obligation_chain` (participants, handoff count, elapsed, resolution), `get_causal_chain` (walk causedByEntryId to root), `list_stalled_obligations`, `get_obligation_stats` (fulfillment rate per channel), `get_telemetry_summary` (per-tool EVENT aggregation). Causal chain via `caused_by_entry_id`. EVENT entries carry telemetry fields. |
 | **13 — Normative channel layout** ✓ | `allowedTypes` field on `Channel` (TEXT nullable; null = open; comma-separated `MessageType` names). `MessageTypePolicy` SPI (`@FunctionalInterface`; `StoredMessageTypePolicy` default; `@Alternative @Priority` override). `MessageTypeViolationException` (extends `IllegalStateException`). Enforcement at MCP tool layer (`send_message`) and `MessageService`. `create_channel` gains optional `allowed_types` (9th param). `NormativeChannelLayout` 3-channel pattern (`work` / `observe` / `oversight`). `examples/normative-layout/` — deterministic CI tests. See `docs/normative-channel-layout.md`. |
+| **14 — Trust signal layer** ✓ | `InstanceActorIdProvider` SPI (#124): maps instanceId → ledger actorId; `DefaultInstanceActorIdProvider` is identity. `CommitmentAttestationPolicy` SPI (#123): writes `LedgerAttestation` on DONE/FAILURE/DECLINE; `StoredCommitmentAttestationPolicy` default (DONE→SOUND/0.7, FAILURE→FLAGGED/0.6, DECLINE→FLAGGED/0.4; configurable). Verdict derived from `MessageType` not `CommitmentStore` — avoids tx-visibility bug inside `REQUIRES_NEW`. Confidence feeds Bayesian Beta trust score in quarkus-ledger. |
 
 ---
 
