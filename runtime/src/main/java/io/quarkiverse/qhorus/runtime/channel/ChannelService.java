@@ -10,6 +10,7 @@ import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 
 import io.quarkiverse.qhorus.runtime.store.ChannelStore;
+import io.quarkiverse.qhorus.runtime.store.MessageStore;
 import io.quarkiverse.qhorus.runtime.store.query.ChannelQuery;
 
 @ApplicationScoped
@@ -17,6 +18,9 @@ public class ChannelService {
 
     @Inject
     ChannelStore channelStore;
+
+    @Inject
+    MessageStore messageStore;
 
     @Transactional
     public Channel create(String name, String description, ChannelSemantic semantic, String barrierContributors) {
@@ -111,6 +115,33 @@ public class ChannelService {
 
     public List<Channel> listAll() {
         return channelStore.scan(ChannelQuery.all());
+    }
+
+    /**
+     * Delete a channel by name. When {@code force=true}, purges all messages in the channel
+     * before deletion (required — {@code fk_message_channel} has no CASCADE).
+     *
+     * @param name the channel name
+     * @param force when false, rejects if the channel has messages
+     * @return number of messages deleted
+     * @throws IllegalArgumentException if the channel does not exist
+     * @throws IllegalStateException if force=false and the channel has messages
+     */
+    @Transactional
+    public long delete(final String name, final boolean force) {
+        Channel ch = findByName(name)
+                .orElseThrow(() -> new IllegalArgumentException("Channel not found: " + name));
+        int messageCount = messageStore.countByChannel(ch.id);
+        if (messageCount > 0 && !force) {
+            throw new IllegalStateException(
+                    "Channel '" + name + "' has " + messageCount
+                            + " messages. Pass force=true to delete anyway.");
+        }
+        if (messageCount > 0) {
+            messageStore.deleteAll(ch.id);
+        }
+        channelStore.delete(ch.id);
+        return messageCount;
     }
 
     @Transactional

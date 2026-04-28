@@ -163,6 +163,18 @@ public class QhorusMcpTools extends QhorusMcpToolsBase {
         return buildInstanceInfoList(instances);
     }
 
+    @Tool(name = "get_instance", description = "Look up a registered instance by its ID. "
+            + "Returns full instance details including capabilities and status. "
+            + "Throws an error if the instance is not found.")
+    @Transactional
+    public InstanceInfo getInstance(
+            @ToolArg(name = "instance_id", description = "Instance ID to look up") String instanceId) {
+        Instance instance = instanceService.findByInstanceId(instanceId)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Instance not found: " + instanceId));
+        return buildInstanceInfoList(java.util.List.of(instance)).get(0);
+    }
+
     // ---------------------------------------------------------------------------
     // Observer tools
     // ---------------------------------------------------------------------------
@@ -377,6 +389,18 @@ public class QhorusMcpTools extends QhorusMcpToolsBase {
         checkAdminAccess(ch, callerInstanceId, "resume_channel");
         ch = channelService.resume(channelName);
         return toChannelDetail(ch, Message.<Message> count("channelId", ch.id));
+    }
+
+    @Tool(name = "delete_channel", description = "Delete a named channel. "
+            + "Rejects with an error if the channel has messages unless force=true. "
+            + "When force=true, all messages in the channel are deleted before the channel is removed.")
+    @Transactional
+    public DeleteChannelResult deleteChannel(
+            @ToolArg(name = "channel_name", description = "Name of the channel to delete") String channelName,
+            @ToolArg(name = "force", description = "When true, deletes all messages in the channel then "
+                    + "deletes the channel. When false (default), rejects if messages exist.", required = false) Boolean force) {
+        long deleted = channelService.delete(channelName, Boolean.TRUE.equals(force));
+        return new DeleteChannelResult(channelName, deleted, "deleted");
     }
 
     /** Convenience overload — no caller identity (open governance assumed). */
@@ -795,6 +819,17 @@ public class QhorusMcpTools extends QhorusMcpToolsBase {
                 .filter(m -> isVisibleToReader(m, readerInstanceId,
                         () -> instanceService.findCapabilityTagsForInstance(readerInstanceId)))
                 .map(this::toMessageSummary).toList();
+    }
+
+    @Tool(name = "get_message", description = "Look up a message by its numeric ID. "
+            + "Returns the message summary including content, type, sender, and metadata. "
+            + "Throws an error if the message is not found.")
+    public MessageSummary getMessage(
+            @ToolArg(name = "message_id", description = "Numeric message ID") Long messageId) {
+        Message message = messageService.findById(messageId)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Message not found: " + messageId));
+        return toMessageSummary(message);
     }
 
     // ---------------------------------------------------------------------------

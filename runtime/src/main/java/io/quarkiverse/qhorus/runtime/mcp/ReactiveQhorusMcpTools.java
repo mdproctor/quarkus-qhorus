@@ -28,6 +28,7 @@ import io.quarkiverse.qhorus.runtime.instance.ReactiveInstanceService;
 import io.quarkiverse.qhorus.runtime.ledger.MessageLedgerEntry;
 import io.quarkiverse.qhorus.runtime.ledger.MessageLedgerEntryRepository;
 import io.quarkiverse.qhorus.runtime.mcp.QhorusMcpToolsBase.CausalChainEntry;
+import io.quarkiverse.qhorus.runtime.mcp.QhorusMcpToolsBase.DeleteChannelResult;
 import io.quarkiverse.qhorus.runtime.mcp.QhorusMcpToolsBase.ObligationChainSummary;
 import io.quarkiverse.qhorus.runtime.mcp.QhorusMcpToolsBase.ObligationStats;
 import io.quarkiverse.qhorus.runtime.mcp.QhorusMcpToolsBase.StalledObligation;
@@ -305,6 +306,17 @@ public class ReactiveQhorusMcpTools extends QhorusMcpToolsBase {
                 .flatMap(ignored -> channelService.resume(channelName))
                 .flatMap(ch -> messageStore.countByChannel(ch.id)
                         .map(count -> toChannelDetail(ch, count.longValue())));
+    }
+
+    @Tool(name = "delete_channel", description = "Delete a named channel. "
+            + "Rejects with an error if the channel has messages unless force=true. "
+            + "When force=true, all messages in the channel are deleted before the channel is removed.")
+    public Uni<DeleteChannelResult> deleteChannel(
+            @ToolArg(name = "channel_name", description = "Name of the channel to delete") String channelName,
+            @ToolArg(name = "force", description = "When true, deletes all messages in the channel then "
+                    + "deletes the channel. When false (default), rejects if messages exist.", required = false) Boolean force) {
+        return channelService.delete(channelName, Boolean.TRUE.equals(force))
+                .map(deleted -> new DeleteChannelResult(channelName, deleted, "deleted"));
     }
 
     // ---------------------------------------------------------------------------
@@ -1318,7 +1330,40 @@ public class ReactiveQhorusMcpTools extends QhorusMcpToolsBase {
         return messages.stream().map(this::toTimelineEntry).toList();
     }
 
-    // 19. list_ledger_entries
+    // 19. get_instance
+    @Tool(name = "get_instance", description = "Look up a registered instance by its ID.")
+    @Blocking
+    public InstanceInfo getInstance(
+            @ToolArg(name = "instance_id", description = "Instance ID to look up") String instanceId) {
+        io.quarkiverse.qhorus.runtime.instance.Instance instance = blockingInstanceService.findByInstanceId(instanceId)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Instance not found: " + instanceId));
+        return buildInstanceInfoListBlocking(java.util.List.of(instance)).get(0);
+    }
+
+    private List<InstanceInfo> buildInstanceInfoListBlocking(List<io.quarkiverse.qhorus.runtime.instance.Instance> instances) {
+        return instances.stream()
+                .map(i -> {
+                    List<String> tags = blockingInstanceService.findCapabilityTagsForInstance(i.instanceId);
+                    return new InstanceInfo(i.instanceId, i.description, i.status, tags,
+                            i.lastSeen.toString());
+                })
+                .toList();
+    }
+
+    // 20. get_message
+    @Tool(name = "get_message", description = "Look up a message by its numeric ID. "
+            + "Returns the message summary including content, type, sender, and metadata.")
+    @Blocking
+    public MessageSummary getMessage(
+            @ToolArg(name = "message_id", description = "Numeric message ID") Long messageId) {
+        io.quarkiverse.qhorus.runtime.message.Message message = blockingMessageService.findById(messageId)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Message not found: " + messageId));
+        return toMessageSummary(message);
+    }
+
+    // 21. list_ledger_entries
     @Tool(name = "list_ledger_entries", description = "Query the immutable audit ledger for a channel. "
             + "Returns all ledger entries in chronological order — every speech act, every tool invocation. "
             + "Use type_filter to narrow by message type: 'COMMAND,DONE,FAILURE' for obligation lifecycle, "
@@ -1376,7 +1421,7 @@ public class ReactiveQhorusMcpTools extends QhorusMcpToolsBase {
                 .stream().map(this::toLedgerEntryMap).toList();
     }
 
-    // 20. get_obligation_chain
+    // 22. get_obligation_chain
     @Tool(name = "get_obligation_chain", description = "Return computed enrichment for an obligation identified by correlation_id: "
             + "initiator, participants, handoff count, elapsed time, resolution, and live commitment state.")
     @Transactional
@@ -1420,7 +1465,7 @@ public class ReactiveQhorusMcpTools extends QhorusMcpToolsBase {
                 resolvedAt, elapsedSeconds, resolution, participants, handoffCount, commitment);
     }
 
-    // 21. get_causal_chain
+    // 23. get_causal_chain
     @Tool(name = "get_causal_chain", description = "Compliance audit tool. Takes a ledger_entry_id (UUID from list_ledger_entries) "
             + "and walks causedByEntryId links upward to the root. Returns chain ordered oldest-first.")
     @Transactional
@@ -1451,7 +1496,7 @@ public class ReactiveQhorusMcpTools extends QhorusMcpToolsBase {
                 .toList();
     }
 
-    // 22. list_stalled_obligations
+    // 24. list_stalled_obligations
     @Tool(name = "list_stalled_obligations", description = "Return COMMAND entries with no terminal sibling "
             + "(DONE / FAILURE / DECLINE / HANDOFF) sharing the same correlation_id, "
             + "whose timestamp is older than the given threshold.")
@@ -1479,7 +1524,7 @@ public class ReactiveQhorusMcpTools extends QhorusMcpToolsBase {
                 .toList();
     }
 
-    // 23. get_obligation_stats
+    // 25. get_obligation_stats
     @Tool(name = "get_obligation_stats", description = "Return obligation outcome statistics for a channel: "
             + "total commands, fulfilled, failed, declined, delegated, still open, stalled, fulfillment rate.")
     @Transactional
@@ -1506,7 +1551,7 @@ public class ReactiveQhorusMcpTools extends QhorusMcpToolsBase {
                 (int) delegated, (int) stillOpen, (int) stalled, rate);
     }
 
-    // 24. get_telemetry_summary
+    // 26. get_telemetry_summary
     @Tool(name = "get_telemetry_summary", description = "Aggregate EVENT telemetry for a channel, grouped by tool name. "
             + "Returns per-tool counts with average duration and total tokens, and channel-wide totals.")
     @Transactional
