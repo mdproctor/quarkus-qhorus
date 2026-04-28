@@ -15,16 +15,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.quarkiverse.ledger.runtime.config.LedgerConfig;
 import io.quarkiverse.ledger.runtime.model.ActorType;
-import io.quarkiverse.ledger.runtime.model.AttestationVerdict;
 import io.quarkiverse.ledger.runtime.model.LedgerAttestation;
 import io.quarkiverse.ledger.runtime.model.LedgerEntry;
 import io.quarkiverse.ledger.runtime.model.LedgerEntryType;
 import io.quarkiverse.qhorus.runtime.channel.Channel;
-import io.quarkiverse.qhorus.runtime.config.QhorusConfig;
-import io.quarkiverse.qhorus.runtime.message.Commitment;
 import io.quarkiverse.qhorus.runtime.message.Message;
 import io.quarkiverse.qhorus.runtime.message.MessageType;
-import io.quarkiverse.qhorus.runtime.store.CommitmentStore;
 
 /**
  * Writes immutable audit ledger entries for every message sent on a channel.
@@ -47,18 +43,31 @@ import io.quarkiverse.qhorus.runtime.store.CommitmentStore;
  * same channel — creating a traversable obligation chain in the ledger.
  *
  * <p>
+ * For DONE, FAILURE, and DECLINE: a {@link LedgerAttestation} is written against the
+ * originating COMMAND's entry via {@link CommitmentAttestationPolicy}. Verdict and
+ * confidence feed the Bayesian Beta trust score in quarkus-ledger. The CommitmentStore
+ * is NOT queried here — attestation verdict is derived from {@link MessageType} directly,
+ * which avoids a transaction-visibility bug (the outer transaction's commitment update
+ * is not yet committed when this {@code REQUIRES_NEW} transaction runs).
+ *
+ * <p>
+ * The {@code actorId} on each entry is resolved through {@link InstanceActorIdProvider}
+ * to map session-scoped instanceIds to persona-scoped ledger actorIds.
+ *
+ * <p>
  * Ledger write failures are caught and logged; they never propagate to the caller.
  * The message pipeline must not be affected by ledger issues.
  *
  * <p>
- * Refs #102, Epic #99.
+ * Refs #102, #123, #124, Epic #99.
  */
 @ApplicationScoped
 public class LedgerWriteService {
 
     private static final Logger LOG = Logger.getLogger(LedgerWriteService.class);
     private static final Set<String> CAUSAL_TYPES = Set.of("DONE", "FAILURE", "DECLINE", "HANDOFF");
-    private static final Set<String> ATTESTATION_TYPES = Set.of("DONE", "FAILURE", "DECLINE");
+    private static final Set<MessageType> ATTESTATION_TYPES = Set.of(
+            MessageType.DONE, MessageType.FAILURE, MessageType.DECLINE);
 
     @Inject
     public MessageLedgerEntryRepository repository;
@@ -67,10 +76,10 @@ public class LedgerWriteService {
     public LedgerConfig config;
 
     @Inject
-    public QhorusConfig qhorusConfig;
+    public InstanceActorIdProvider actorIdProvider;
 
     @Inject
-    public CommitmentStore commitmentStore;
+    public CommitmentAttestationPolicy attestationPolicy;
 
     @Inject
     public ObjectMapper objectMapper;
@@ -94,6 +103,8 @@ public class LedgerWriteService {
         final Optional<LedgerEntry> latest = repository.findLatestBySubjectId(ch.id);
         final int sequenceNumber = latest.map(e -> e.sequenceNumber + 1).orElse(1);
 
+        final String resolvedActorId = actorIdProvider.resolve(message.sender);
+
         final MessageLedgerEntry entry = new MessageLedgerEntry();
         entry.subjectId = ch.id;
         entry.channelId = ch.id;
@@ -102,7 +113,7 @@ public class LedgerWriteService {
         entry.target = message.target;
         entry.correlationId = message.correlationId;
         entry.commitmentId = message.commitmentId;
-        entry.actorId = message.sender;
+        entry.actorId = resolvedActorId;
         entry.actorType = ActorType.AGENT;
         entry.occurredAt = message.createdAt.truncatedTo(ChronoUnit.MILLIS);
         entry.sequenceNumber = sequenceNumber;
@@ -119,80 +130,15 @@ public class LedgerWriteService {
 
         if (CAUSAL_TYPES.contains(message.messageType.name()) && message.correlationId != null) {
             repository.findLatestByCorrelationId(ch.id, message.correlationId)
-                    .ifPresent(prior -> entry.causedByEntryId = prior.id);
+                    .ifPresent(prior -> {
+                        entry.causedByEntryId = prior.id;
+                        if (ATTESTATION_TYPES.contains(message.messageType)) {
+                            writeAttestation(ch, prior, message.messageType, resolvedActorId);
+                        }
+                    });
         }
 
         repository.save(entry);
-
-        if (ATTESTATION_TYPES.contains(message.messageType.name()) && message.correlationId != null) {
-            writeAttestation(ch, message, entry);
-        }
-    }
-
-    /**
-     * Writes a {@link LedgerAttestation} against the originating COMMAND's
-     * {@link MessageLedgerEntry} when a terminal outcome (DONE, FAILURE, DECLINE) is recorded.
-     *
-     * <p>
-     * DONE → SOUND attestation from the message sender (requester).
-     * FAILURE / DECLINE → FLAGGED attestation from the system.
-     *
-     * <p>
-     * Non-fatal: if no matching COMMAND entry exists, logs WARN and returns.
-     * Runs in the same {@code REQUIRES_NEW} transaction as {@link #record}.
-     */
-    private void writeAttestation(final Channel ch, final Message message,
-            final MessageLedgerEntry outcomeEntry) {
-        // Only attest when a terminal Commitment can be confirmed for this correlationId.
-        final Optional<Commitment> commitment = commitmentStore.findByCorrelationId(message.correlationId);
-        if (commitment.isEmpty() || !commitment.get().state.isTerminal()) {
-            LOG.warnf("No terminal Commitment found for correlationId '%s' — skipping LedgerAttestation",
-                    message.correlationId);
-            return;
-        }
-
-        // Find the originating COMMAND entry to attach the attestation to.
-        final Optional<MessageLedgerEntry> commandEntry = repository.findLatestByCorrelationId(
-                ch.id, message.correlationId);
-        if (commandEntry.isEmpty()) {
-            LOG.warnf(
-                    "No COMMAND ledger entry found for correlationId '%s' on channel %s — skipping LedgerAttestation",
-                    message.correlationId, ch.id);
-            return;
-        }
-
-        final MessageLedgerEntry cmd = commandEntry.get();
-        final LedgerAttestation attestation = new LedgerAttestation();
-        attestation.ledgerEntryId = cmd.id;
-        attestation.subjectId = ch.id;
-
-        switch (message.messageType) {
-            case DONE -> {
-                attestation.verdict = AttestationVerdict.SOUND;
-                attestation.confidence = qhorusConfig.attestation().doneConfidence();
-                attestation.attestorId = message.sender;
-                attestation.attestorType = ActorType.AGENT;
-            }
-            case FAILURE -> {
-                attestation.verdict = AttestationVerdict.FLAGGED;
-                attestation.confidence = qhorusConfig.attestation().failureConfidence();
-                attestation.attestorId = "system";
-                attestation.attestorType = ActorType.SYSTEM;
-            }
-            case DECLINE -> {
-                attestation.verdict = AttestationVerdict.FLAGGED;
-                attestation.confidence = qhorusConfig.attestation().declineConfidence();
-                attestation.attestorId = "system";
-                attestation.attestorType = ActorType.SYSTEM;
-            }
-            default -> {
-                return;
-            }
-        }
-
-        repository.saveAttestation(attestation);
-        LOG.debugf("LedgerAttestation %s written for COMMAND entry %s (correlationId='%s')",
-                attestation.verdict, cmd.id, message.correlationId);
     }
 
     /**
@@ -203,6 +149,27 @@ public class LedgerWriteService {
     @Transactional(value = Transactional.TxType.REQUIRES_NEW)
     public void recordEvent(final Channel ch, final Message message) {
         record(ch, message);
+    }
+
+    private void writeAttestation(final Channel ch, final MessageLedgerEntry commandEntry,
+            final MessageType terminalType, final String resolvedActorId) {
+        attestationPolicy.attestationFor(terminalType, resolvedActorId).ifPresent(outcome -> {
+            try {
+                final LedgerAttestation attestation = new LedgerAttestation();
+                attestation.ledgerEntryId = commandEntry.id;
+                attestation.subjectId = ch.id;
+                attestation.attestorId = outcome.attestorId();
+                attestation.attestorType = outcome.attestorType();
+                attestation.verdict = outcome.verdict();
+                attestation.confidence = outcome.confidence();
+                repository.saveAttestation(attestation);
+                LOG.debugf("LedgerAttestation %s written for COMMAND entry %s (correlationId='%s')",
+                        attestation.verdict, commandEntry.id, commandEntry.correlationId);
+            } catch (final Exception e) {
+                LOG.warnf("Could not write attestation for entry %s — trust signal lost but pipeline unaffected",
+                        commandEntry.id);
+            }
+        });
     }
 
     private void populateTelemetry(final MessageLedgerEntry entry, final String content) {

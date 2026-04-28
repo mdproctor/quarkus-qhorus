@@ -22,22 +22,21 @@ import io.quarkiverse.ledger.runtime.model.LedgerAttestation;
 import io.quarkiverse.ledger.runtime.model.LedgerEntry;
 import io.quarkiverse.ledger.runtime.model.LedgerEntryType;
 import io.quarkiverse.qhorus.runtime.channel.Channel;
-import io.quarkiverse.qhorus.runtime.config.QhorusConfig;
+import io.quarkiverse.qhorus.runtime.ledger.CommitmentAttestationPolicy;
+import io.quarkiverse.qhorus.runtime.ledger.CommitmentAttestationPolicy.AttestationOutcome;
+import io.quarkiverse.qhorus.runtime.ledger.InstanceActorIdProvider;
 import io.quarkiverse.qhorus.runtime.ledger.LedgerWriteService;
 import io.quarkiverse.qhorus.runtime.ledger.MessageLedgerEntry;
 import io.quarkiverse.qhorus.runtime.ledger.MessageLedgerEntryRepository;
-import io.quarkiverse.qhorus.runtime.message.Commitment;
-import io.quarkiverse.qhorus.runtime.message.CommitmentState;
 import io.quarkiverse.qhorus.runtime.message.Message;
 import io.quarkiverse.qhorus.runtime.message.MessageType;
-import io.quarkiverse.qhorus.runtime.store.CommitmentStore;
 
 /**
  * Pure unit tests for {@link LedgerWriteService#record} — no Quarkus runtime.
  * Uses a capturing stub repository and Mockito for LedgerConfig.
  *
  * <p>
- * Refs #102 — Epic #99.
+ * Refs #102, #123, #124 — Epic #99.
  */
 class LedgerWriteServiceTest {
 
@@ -82,84 +81,34 @@ class LedgerWriteServiceTest {
         }
     }
 
-    // ── Stub CommitmentStore ──────────────────────────────────────────────────
-
-    static class StubCommitmentStore implements CommitmentStore {
-        Commitment stubCommitment;
-
-        @Override
-        public Optional<Commitment> findByCorrelationId(final String correlationId) {
-            if (stubCommitment != null && correlationId.equals(stubCommitment.correlationId)) {
-                return Optional.of(stubCommitment);
-            }
-            return Optional.empty();
-        }
-
-        @Override
-        public Commitment save(Commitment c) {
-            return c;
-        }
-
-        @Override
-        public Optional<Commitment> findById(UUID id) {
-            return Optional.empty();
-        }
-
-        @Override
-        public List<Commitment> findOpenByObligor(String o, UUID c) {
-            return List.of();
-        }
-
-        @Override
-        public List<Commitment> findOpenByRequester(String r, UUID c) {
-            return List.of();
-        }
-
-        @Override
-        public List<Commitment> findByState(CommitmentState s, UUID c) {
-            return List.of();
-        }
-
-        @Override
-        public List<Commitment> findExpiredBefore(Instant i) {
-            return List.of();
-        }
-
-        @Override
-        public void deleteById(UUID id) {
-        }
-
-        @Override
-        public long deleteExpiredBefore(Instant i) {
-            return 0;
-        }
-    }
-
     private CapturingRepo repo;
-    private StubCommitmentStore commitmentStore;
+    private CommitmentAttestationPolicy attestationPolicy;
+    private InstanceActorIdProvider actorIdProvider;
     private LedgerWriteService service;
     private LedgerConfig enabledConfig;
-    private QhorusConfig qhorusConfig;
-    private QhorusConfig.Attestation attestationConfig;
 
     @BeforeEach
     void setup() {
         repo = new CapturingRepo();
-        commitmentStore = new StubCommitmentStore();
         enabledConfig = mock(LedgerConfig.class);
         when(enabledConfig.enabled()).thenReturn(true);
-        attestationConfig = mock(QhorusConfig.Attestation.class);
-        when(attestationConfig.doneConfidence()).thenReturn(0.7);
-        when(attestationConfig.failureConfidence()).thenReturn(0.6);
-        when(attestationConfig.declineConfidence()).thenReturn(0.4);
-        qhorusConfig = mock(QhorusConfig.class);
-        when(qhorusConfig.attestation()).thenReturn(attestationConfig);
+
+        // Default policy matching StoredCommitmentAttestationPolicy behaviour
+        attestationPolicy = (type, actorId) -> switch (type) {
+            case DONE -> Optional.of(new AttestationOutcome(AttestationVerdict.SOUND, 0.7, actorId, ActorType.AGENT));
+            case FAILURE -> Optional.of(new AttestationOutcome(AttestationVerdict.FLAGGED, 0.6, "system", ActorType.SYSTEM));
+            case DECLINE -> Optional.of(new AttestationOutcome(AttestationVerdict.FLAGGED, 0.4, "system", ActorType.SYSTEM));
+            default -> Optional.empty();
+        };
+        actorIdProvider = id -> id; // identity — default behaviour
+
         service = new LedgerWriteService();
         service.repository = repo;
         service.config = enabledConfig;
-        service.qhorusConfig = qhorusConfig;
-        service.commitmentStore = commitmentStore;
+        service.actorIdProvider = actorIdProvider;
+        service.attestationPolicy = attestationPolicy;
         service.objectMapper = new ObjectMapper();
+        // Note: NO service.commitmentStore — it is removed from LedgerWriteService
     }
 
     // ── Happy path — one test per message type ───────────────────────────────
@@ -429,11 +378,10 @@ class LedgerWriteServiceTest {
     // ── LedgerAttestation on terminal outcomes — Closes #123 ─────────────────
 
     @Test
-    void record_done_withMatchingTerminalCommitment_writesSoundAttestation() {
+    void record_done_withMatchingCommandEntry_writesSoundAttestation() {
         UUID channelId = UUID.randomUUID();
         Channel ch = channel(channelId);
 
-        // Seed a COMMAND ledger entry so the originating entry can be found.
         MessageLedgerEntry cmdEntry = new MessageLedgerEntry();
         cmdEntry.id = UUID.randomUUID();
         cmdEntry.subjectId = channelId;
@@ -443,12 +391,6 @@ class LedgerWriteServiceTest {
         cmdEntry.sequenceNumber = 1;
         repo.saved.add(cmdEntry);
 
-        // Provide a terminal commitment for the same correlationId.
-        Commitment c = new Commitment();
-        c.correlationId = "corr-attest-done";
-        c.state = CommitmentState.FULFILLED;
-        commitmentStore.stubCommitment = c;
-
         service.record(ch, message("DONE", "Done!", "agent-b", "corr-attest-done", null));
 
         assertEquals(1, repo.savedAttestations.size());
@@ -457,12 +399,12 @@ class LedgerWriteServiceTest {
         assertEquals(channelId, a.subjectId);
         assertEquals(AttestationVerdict.SOUND, a.verdict);
         assertEquals(0.7, a.confidence, 1e-9);
-        assertEquals("agent-b", a.attestorId);
+        assertEquals("agent-b", a.attestorId); // DONE sender's resolved actorId
         assertEquals(ActorType.AGENT, a.attestorType);
     }
 
     @Test
-    void record_failure_withMatchingTerminalCommitment_writesFlaggedAttestation() {
+    void record_failure_withMatchingCommandEntry_writesFlaggedAttestation() {
         UUID channelId = UUID.randomUUID();
         Channel ch = channel(channelId);
 
@@ -475,16 +417,10 @@ class LedgerWriteServiceTest {
         cmdEntry.sequenceNumber = 1;
         repo.saved.add(cmdEntry);
 
-        Commitment c = new Commitment();
-        c.correlationId = "corr-attest-fail";
-        c.state = CommitmentState.FAILED;
-        commitmentStore.stubCommitment = c;
-
         service.record(ch, message("FAILURE", "Timed out", "agent-b", "corr-attest-fail", null));
 
         assertEquals(1, repo.savedAttestations.size());
         LedgerAttestation a = repo.savedAttestations.get(0);
-        assertEquals(cmdEntry.id, a.ledgerEntryId);
         assertEquals(AttestationVerdict.FLAGGED, a.verdict);
         assertEquals(0.6, a.confidence, 1e-9);
         assertEquals("system", a.attestorId);
@@ -492,21 +428,122 @@ class LedgerWriteServiceTest {
     }
 
     @Test
-    void record_done_noMatchingCommandEntry_doesNotFail_logsWarn() {
+    void record_done_noMatchingCommandEntry_noAttestation_noException() {
+        service.record(channel(), message("DONE", "Done", "agent-b", "corr-no-cmd", null));
+
+        assertEquals(1, repo.saved.size()); // ledger entry still written
+        assertTrue(repo.savedAttestations.isEmpty()); // no attestation — no command entry found
+    }
+
+    @Test
+    void record_decline_withMatchingCommandEntry_writesFlaggedAttestation() {
         UUID channelId = UUID.randomUUID();
         Channel ch = channel(channelId);
 
-        // Provide a terminal commitment but NO matching COMMAND ledger entry.
-        Commitment c = new Commitment();
-        c.correlationId = "corr-no-cmd";
-        c.state = CommitmentState.FULFILLED;
-        commitmentStore.stubCommitment = c;
+        MessageLedgerEntry cmdEntry = new MessageLedgerEntry();
+        cmdEntry.id = UUID.randomUUID();
+        cmdEntry.subjectId = channelId;
+        cmdEntry.channelId = channelId;
+        cmdEntry.messageType = "COMMAND";
+        cmdEntry.correlationId = "corr-dec";
+        cmdEntry.sequenceNumber = 1;
+        repo.saved.add(cmdEntry);
 
-        // Must not throw.
-        assertDoesNotThrow(() -> service.record(ch, message("DONE", "Done", "agent-b", "corr-no-cmd", null)));
+        service.record(ch, message("DECLINE", "Out of scope", "agent-b", "corr-dec", null));
 
-        // The ledger entry for DONE is still written; no attestation is written.
-        assertEquals(1, repo.saved.size());
+        assertEquals(1, repo.savedAttestations.size());
+        LedgerAttestation a = repo.savedAttestations.get(0);
+        assertEquals(AttestationVerdict.FLAGGED, a.verdict);
+        assertEquals(0.4, a.confidence, 1e-9);
+        assertEquals("system", a.attestorId);
+        assertEquals(ActorType.SYSTEM, a.attestorType);
+    }
+
+    @Test
+    void record_handoff_doesNotWriteAttestation() {
+        UUID channelId = UUID.randomUUID();
+        Channel ch = channel(channelId);
+
+        MessageLedgerEntry cmdEntry = new MessageLedgerEntry();
+        cmdEntry.id = UUID.randomUUID();
+        cmdEntry.subjectId = channelId;
+        cmdEntry.messageType = "COMMAND";
+        cmdEntry.correlationId = "corr-handoff";
+        cmdEntry.sequenceNumber = 1;
+        repo.saved.add(cmdEntry);
+
+        Message msg = message("HANDOFF", null, "agent-a", "corr-handoff", null);
+        msg.target = "instance:agent-c";
+        service.record(ch, msg);
+
+        assertTrue(repo.savedAttestations.isEmpty());
+    }
+
+    @Test
+    void record_status_doesNotWriteAttestation() {
+        service.record(channel(), message("STATUS", "Working", "agent-b", "corr-1", null));
+        assertTrue(repo.savedAttestations.isEmpty());
+    }
+
+    @Test
+    void record_event_doesNotWriteAttestation() {
+        service.record(channel(),
+                message("EVENT", "{\"tool_name\":\"read\"}", "agent-a", null, null));
+        assertTrue(repo.savedAttestations.isEmpty());
+    }
+
+    @Test
+    void record_done_nullCorrelationId_noAttestation() {
+        service.record(channel(), message("DONE", "Done", "agent-b", null, null));
+        assertTrue(repo.savedAttestations.isEmpty());
+    }
+
+    @Test
+    void record_actorId_resolvedViaProvider() {
+        service.actorIdProvider = id -> "claudony-worker-abc".equals(id) ? "claude:analyst@v1" : id;
+
+        service.record(channel(), message("COMMAND", "Do it", "claudony-worker-abc", "corr-x", null));
+
+        assertEquals("claude:analyst@v1", repo.saved.get(0).actorId);
+    }
+
+    @Test
+    void record_done_resolvedActorId_usedInAttestation() {
+        UUID channelId = UUID.randomUUID();
+        Channel ch = channel(channelId);
+
+        service.actorIdProvider = id -> "claude:analyst@v1";
+
+        MessageLedgerEntry cmdEntry = new MessageLedgerEntry();
+        cmdEntry.id = UUID.randomUUID();
+        cmdEntry.subjectId = channelId;
+        cmdEntry.messageType = "COMMAND";
+        cmdEntry.correlationId = "corr-persona";
+        cmdEntry.sequenceNumber = 1;
+        repo.saved.add(cmdEntry);
+
+        service.record(ch, message("DONE", "Done", "claudony-worker-abc", "corr-persona", null));
+
+        assertEquals("claude:analyst@v1", repo.savedAttestations.get(0).attestorId);
+    }
+
+    @Test
+    void record_customAttestationPolicy_empty_noAttestation() {
+        service.attestationPolicy = (type, actorId) -> Optional.empty();
+
+        UUID channelId = UUID.randomUUID();
+        Channel ch = channel(channelId);
+        MessageLedgerEntry cmdEntry = new MessageLedgerEntry();
+        cmdEntry.id = UUID.randomUUID();
+        cmdEntry.subjectId = channelId;
+        cmdEntry.messageType = "COMMAND";
+        cmdEntry.correlationId = "corr-suppressed";
+        cmdEntry.sequenceNumber = 1;
+        repo.saved.add(cmdEntry);
+
+        service.record(ch, message("DONE", "Done", "agent-b", "corr-suppressed", null));
+
+        assertEquals(2, repo.saved.size()); // pre-seeded COMMAND + the new DONE entry
         assertTrue(repo.savedAttestations.isEmpty());
     }
 
