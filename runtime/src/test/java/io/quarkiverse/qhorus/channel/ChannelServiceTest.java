@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import jakarta.inject.Inject;
 
@@ -13,6 +14,8 @@ import org.junit.jupiter.api.Test;
 import io.quarkiverse.qhorus.runtime.channel.Channel;
 import io.quarkiverse.qhorus.runtime.channel.ChannelSemantic;
 import io.quarkiverse.qhorus.runtime.channel.ChannelService;
+import io.quarkiverse.qhorus.runtime.message.MessageService;
+import io.quarkiverse.qhorus.runtime.message.MessageType;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.TestTransaction;
 import io.quarkus.test.junit.QuarkusTest;
@@ -22,6 +25,9 @@ class ChannelServiceTest {
 
     @Inject
     ChannelService channelService;
+
+    @Inject
+    MessageService messageService;
 
     @Test
     @TestTransaction
@@ -145,5 +151,60 @@ class ChannelServiceTest {
 
         // Cleanup the committed first record
         QuarkusTransaction.requiringNew().run(() -> Channel.delete("name", uniqueName));
+    }
+
+    @Test
+    void delete_emptyChannel_succeeds() {
+        String name = "del-empty-" + System.nanoTime();
+        QuarkusTransaction.requiringNew().run(() -> channelService.create(name, "Test", ChannelSemantic.APPEND, null));
+
+        QuarkusTransaction.requiringNew().run(() -> {
+            long deleted = channelService.delete(name, false);
+            assertEquals(0L, deleted);
+        });
+
+        QuarkusTransaction.requiringNew().run(() -> assertTrue(channelService.findByName(name).isEmpty()));
+    }
+
+    @Test
+    void delete_notFound_throwsIllegalArgument() {
+        assertThrows(IllegalArgumentException.class, () -> QuarkusTransaction.requiringNew()
+                .run(() -> channelService.delete("no-such-channel-" + System.nanoTime(), false)));
+    }
+
+    @Test
+    void delete_withMessages_forceTrue_deletesMessagesAndChannel() {
+        String name = "del-force-" + System.nanoTime();
+        QuarkusTransaction.requiringNew().run(() -> channelService.create(name, "Test", ChannelSemantic.APPEND, null));
+
+        UUID[] chId = new UUID[1];
+        QuarkusTransaction.requiringNew().run(() -> chId[0] = channelService.findByName(name).orElseThrow().id);
+
+        QuarkusTransaction.requiringNew()
+                .run(() -> messageService.send(chId[0], "agent-a", MessageType.STATUS, "hi", null, null));
+
+        QuarkusTransaction.requiringNew().run(() -> {
+            long deleted = channelService.delete(name, true);
+            assertEquals(1L, deleted);
+        });
+
+        QuarkusTransaction.requiringNew().run(() -> assertTrue(channelService.findByName(name).isEmpty()));
+    }
+
+    @Test
+    void delete_withMessages_forceFalse_throwsIllegalState() {
+        String name = "del-noforce-" + System.nanoTime();
+        QuarkusTransaction.requiringNew().run(() -> channelService.create(name, "Test", ChannelSemantic.APPEND, null));
+
+        UUID[] chId = new UUID[1];
+        QuarkusTransaction.requiringNew().run(() -> chId[0] = channelService.findByName(name).orElseThrow().id);
+
+        QuarkusTransaction.requiringNew()
+                .run(() -> messageService.send(chId[0], "agent-a", MessageType.STATUS, "hi", null, null));
+
+        Exception ex = assertThrows(Exception.class,
+                () -> QuarkusTransaction.requiringNew().run(() -> channelService.delete(name, false)));
+        assertTrue(ex.getMessage().contains("1") && ex.getMessage().contains("force=true"),
+                "Error should mention message count and force=true: " + ex.getMessage());
     }
 }

@@ -9,6 +9,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Alternative;
 import jakarta.inject.Inject;
 
+import io.quarkiverse.qhorus.runtime.store.MessageStore;
 import io.quarkiverse.qhorus.runtime.store.ReactiveChannelStore;
 import io.quarkiverse.qhorus.runtime.store.query.ChannelQuery;
 import io.quarkus.hibernate.reactive.panache.Panache;
@@ -20,6 +21,9 @@ public class ReactiveChannelService {
 
     @Inject
     ReactiveChannelStore channelStore;
+
+    @Inject
+    public MessageStore messageStore;
 
     public Uni<Channel> create(String name, String description, ChannelSemantic semantic,
             String barrierContributors, String allowedWriters, String adminInstances,
@@ -119,6 +123,33 @@ public class ReactiveChannelService {
 
     public Uni<List<Channel>> listAll() {
         return channelStore.scan(ChannelQuery.all());
+    }
+
+    /**
+     * Delete a channel by name. Uses blocking {@code MessageStore} for count and purge
+     * (no reactive equivalents). Infrequent admin operation — blocking is acceptable.
+     *
+     * @param name the channel name
+     * @param force when false, rejects if the channel has messages
+     * @return number of messages deleted
+     */
+    public Uni<Long> delete(final String name, final boolean force) {
+        return Panache.withTransaction(() -> channelStore.findByName(name)
+                .map(opt -> opt.orElseThrow(
+                        () -> new IllegalArgumentException("Channel not found: " + name)))
+                .map(ch -> {
+                    int messageCount = messageStore.countByChannel(ch.id);
+                    if (messageCount > 0 && !force) {
+                        throw new IllegalStateException(
+                                "Channel '" + name + "' has " + messageCount
+                                        + " messages. Pass force=true to delete anyway.");
+                    }
+                    if (messageCount > 0) {
+                        messageStore.deleteAll(ch.id);
+                    }
+                    channelStore.delete(ch.id);
+                    return (long) messageCount;
+                }));
     }
 
     public Uni<Void> updateLastActivity(UUID channelId) {
