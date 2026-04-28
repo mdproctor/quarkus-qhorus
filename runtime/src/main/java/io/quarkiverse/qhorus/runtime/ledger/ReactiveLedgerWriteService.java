@@ -40,12 +40,20 @@ public class ReactiveLedgerWriteService {
 
     private static final Logger LOG = Logger.getLogger(ReactiveLedgerWriteService.class);
     private static final Set<String> CAUSAL_TYPES = Set.of("DONE", "FAILURE", "DECLINE", "HANDOFF");
+    private static final Set<MessageType> ATTESTATION_TYPES = Set.of(
+            MessageType.DONE, MessageType.FAILURE, MessageType.DECLINE);
 
     @Inject
     ReactiveMessageLedgerEntryRepository reactiveRepo;
 
     @Inject
     LedgerConfig config;
+
+    @Inject
+    public InstanceActorIdProvider actorIdProvider;
+
+    @Inject
+    public CommitmentAttestationPolicy attestationPolicy;
 
     @Inject
     ObjectMapper objectMapper;
@@ -72,7 +80,8 @@ public class ReactiveLedgerWriteService {
             entry.target = message.target;
             entry.correlationId = message.correlationId;
             entry.commitmentId = message.commitmentId;
-            entry.actorId = message.sender;
+            final String resolvedActorId = actorIdProvider.resolve(message.sender);
+            entry.actorId = resolvedActorId;
             entry.actorType = ActorType.AGENT;
             entry.occurredAt = message.createdAt.truncatedTo(ChronoUnit.MILLIS);
             entry.sequenceNumber = sequenceNumber;
@@ -90,12 +99,26 @@ public class ReactiveLedgerWriteService {
             if (CAUSAL_TYPES.contains(message.messageType.name()) && message.correlationId != null) {
                 return reactiveRepo.findLatestByCorrelationId(ch.id, message.correlationId)
                         .flatMap(priorOpt -> {
-                            priorOpt.ifPresent(prior -> entry.causedByEntryId = prior.id);
+                            priorOpt.ifPresent(prior -> {
+                                entry.causedByEntryId = prior.id;
+                                if (ATTESTATION_TYPES.contains(message.messageType)) {
+                                    logSkippedAttestation(prior, message.messageType);
+                                }
+                            });
                             return reactiveRepo.save(entry).replaceWithVoid();
                         });
             }
             return reactiveRepo.save(entry).replaceWithVoid();
         }));
+    }
+
+    private void logSkippedAttestation(final MessageLedgerEntry commandEntry,
+            final MessageType terminalType) {
+        // Reactive attestation writes not yet supported — ReactiveMessageLedgerEntryRepository
+        // throws UnsupportedOperationException on saveAttestation(). The blocking LedgerWriteService
+        // is the authoritative attestation path. Log at DEBUG so it's trackable.
+        LOG.debugf("Reactive path: attestation for %s on COMMAND entry %s deferred to blocking path",
+                terminalType, commandEntry.id);
     }
 
     private void populateTelemetry(final MessageLedgerEntry entry, final String content) {
