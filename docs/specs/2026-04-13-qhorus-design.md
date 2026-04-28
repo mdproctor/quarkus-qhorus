@@ -378,6 +378,7 @@ All tools exposed via the single `/mcp` Streamable HTTP endpoint.
 | `register` | Register presence with capability tags. Returns active channels and online instances. Optional `claudony_session_id` for Claudony-managed workers. |
 | `deregister_instance` | Deregister an instance from the registry. |
 | `list_instances` | Live roster with status, capabilities, last-seen. Supports filter by capability tag. |
+| `get_instance` | Direct lookup by instance ID. Throws if not found. |
 
 ### Channel Operations
 
@@ -387,6 +388,7 @@ All tools exposed via the single `/mcp` Streamable HTTP endpoint.
 | `list_channels` | All channels with message count, last activity, active senders. |
 | `find_channel` | Keyword search over channel names and descriptions. |
 | `get_channel_digest` | Summary digest of a channel — message count, active senders, last activity. |
+| `delete_channel` | Delete a named channel. Rejects if messages exist unless `force=true`. With `force=true`, purges all messages first (required — `fk_message_channel` has no CASCADE), then deletes the channel. |
 | `clear_channel` | Remove all messages from a channel. |
 | `pause_channel` | Pause a channel — new messages are queued but not delivered. |
 | `resume_channel` | Resume a paused channel and flush queued messages. |
@@ -404,6 +406,7 @@ All tools exposed via the single `/mcp` Streamable HTTP endpoint.
 | `wait_for_reply` | Persistent long-poll with SSE keepalives. Polls Commitment state by `correlation_id` — wakes when state reaches FULFILLED, DECLINED, FAILED, or EXPIRED. Re-entrant safe: uses UUID not positional matching. Transparently follows HANDOFF delegation chains. |
 | `cancel_wait` | Cancel an in-progress `wait_for_reply` for a given correlation ID. |
 | `get_replies` | Retrieve replies to a specific message ID. Supports `after_id` and `limit` cursor pagination. |
+| `get_message` | Direct lookup by numeric message ID. Throws if not found. |
 | `delete_message` | Delete a message by ID. |
 | `search_messages` | Full-text search across all channels. |
 
