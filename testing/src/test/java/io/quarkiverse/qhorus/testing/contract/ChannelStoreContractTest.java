@@ -101,6 +101,24 @@ public abstract class ChannelStoreContractTest {
         assertTrue(find(ch.id).isEmpty());
     }
 
+    @Test
+    void put_and_find_preserves_allowedTypes() {
+        Channel ch = channel("allowed-types-" + UUID.randomUUID(), ChannelSemantic.APPEND);
+        ch.allowedTypes = "EVENT";
+        put(ch);
+        Channel found = find(ch.id).orElseThrow();
+        assertEquals("EVENT", found.allowedTypes);
+    }
+
+    @Test
+    void put_and_find_preserves_null_allowedTypes() {
+        Channel ch = channel("null-allowed-" + UUID.randomUUID(), ChannelSemantic.APPEND);
+        ch.allowedTypes = null;
+        put(ch);
+        Channel found = find(ch.id).orElseThrow();
+        assertNull(found.allowedTypes);
+    }
+
     protected Channel channel(String name, ChannelSemantic semantic) {
         Channel ch = new Channel();
         ch.name = name;

@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>io.quarkiverse.qhorus</groupId>
+    <artifactId>quarkus-qhorus-examples</artifactId>
+    <version>0.2-SNAPSHOT</version>
+  </parent>
+
+  <artifactId>quarkus-qhorus-example-normative-layout</artifactId>
+  <name>Quarkus Qhorus :: Examples :: Normative Channel Layout</name>
+  <description>
+    Deterministic CI tests proving the 3-channel NormativeChannelLayout pattern.
+    No LLM required. Canonical Layer 1 reference importable by Claudony and CaseHub.
+    Covers: happy path, type enforcement, obligation lifecycle, robustness, correctness.
+  </description>
+
+  <dependencies>
+    <dependency>
+      <groupId>io.quarkiverse.qhorus</groupId>
+      <artifactId>quarkus-qhorus</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>io.quarkiverse.qhorus</groupId>
+      <artifactId>quarkus-qhorus-testing</artifactId>
+      <version>${project.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.quarkus</groupId>
+      <artifactId>quarkus-jdbc-h2</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.quarkus</groupId>
+      <artifactId>quarkus-junit5</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.rest-assured</groupId>
+      <artifactId>rest-assured</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.assertj</groupId>
+      <artifactId>assertj-core</artifactId>
+      <version>3.27.3</version>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>

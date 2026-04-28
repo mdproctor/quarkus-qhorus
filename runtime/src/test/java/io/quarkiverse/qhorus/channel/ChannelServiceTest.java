@@ -95,6 +95,45 @@ class ChannelServiceTest {
     }
 
     @Test
+    void createWithAllowedTypes_storesConstraint() {
+        String name = "allowed-types-" + System.nanoTime();
+        QuarkusTransaction.requiringNew().run(() -> {
+            Channel ch = channelService.create(name, "Telemetry", ChannelSemantic.APPEND,
+                    null, null, null, null, null, "EVENT");
+            assertEquals("EVENT", ch.allowedTypes);
+        });
+    }
+
+    @Test
+    void createWithNullAllowedTypes_storesNull() {
+        String name = "no-allowed-types-" + System.nanoTime();
+        QuarkusTransaction.requiringNew().run(() -> {
+            Channel ch = channelService.create(name, "Open", ChannelSemantic.APPEND,
+                    null, null, null, null, null, null);
+            assertNull(ch.allowedTypes);
+        });
+    }
+
+    @Test
+    void createWithBlankAllowedTypes_storesNull() {
+        String name = "blank-allowed-types-" + System.nanoTime();
+        QuarkusTransaction.requiringNew().run(() -> {
+            Channel ch = channelService.create(name, "Open", ChannelSemantic.APPEND,
+                    null, null, null, null, null, "  ");
+            assertNull(ch.allowedTypes);
+        });
+    }
+
+    @Test
+    void existingFourParamOverload_setsNullAllowedTypes() {
+        String name = "legacy-overload-" + System.nanoTime();
+        QuarkusTransaction.requiringNew().run(() -> {
+            Channel ch = channelService.create(name, "Legacy", ChannelSemantic.APPEND, null);
+            assertNull(ch.allowedTypes);
+        });
+    }
+
+    @Test
     void duplicateChannelNameThrowsException() {
         // Use explicit transactions so each commit is independent and the unique
         // constraint is actually checked against the DB (not just the Hibernate cache)

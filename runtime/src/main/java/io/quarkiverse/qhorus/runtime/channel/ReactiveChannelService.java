@@ -24,6 +24,13 @@ public class ReactiveChannelService {
     public Uni<Channel> create(String name, String description, ChannelSemantic semantic,
             String barrierContributors, String allowedWriters, String adminInstances,
             Integer rateLimitPerChannel, Integer rateLimitPerInstance) {
+        return create(name, description, semantic, barrierContributors, allowedWriters,
+                adminInstances, rateLimitPerChannel, rateLimitPerInstance, null);
+    }
+
+    public Uni<Channel> create(String name, String description, ChannelSemantic semantic,
+            String barrierContributors, String allowedWriters, String adminInstances,
+            Integer rateLimitPerChannel, Integer rateLimitPerInstance, String allowedTypes) {
         return Panache.withTransaction(() -> {
             Channel channel = new Channel();
             channel.name = name;
@@ -34,6 +41,7 @@ public class ReactiveChannelService {
             channel.adminInstances = (adminInstances == null || adminInstances.isBlank()) ? null : adminInstances;
             channel.rateLimitPerChannel = rateLimitPerChannel;
             channel.rateLimitPerInstance = rateLimitPerInstance;
+            channel.allowedTypes = (allowedTypes == null || allowedTypes.isBlank()) ? null : allowedTypes;
             return channelStore.put(channel);
         });
     }

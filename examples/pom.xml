@@ -21,6 +21,7 @@
   -->
   <modules>
     <module>type-system</module>
+    <module>normative-layout</module>
   </modules>
 
   <profiles>

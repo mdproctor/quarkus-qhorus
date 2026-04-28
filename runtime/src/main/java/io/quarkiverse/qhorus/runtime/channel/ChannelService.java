@@ -38,6 +38,14 @@ public class ChannelService {
     @Transactional
     public Channel create(String name, String description, ChannelSemantic semantic, String barrierContributors,
             String allowedWriters, String adminInstances, Integer rateLimitPerChannel, Integer rateLimitPerInstance) {
+        return create(name, description, semantic, barrierContributors, allowedWriters,
+                adminInstances, rateLimitPerChannel, rateLimitPerInstance, null);
+    }
+
+    @Transactional
+    public Channel create(String name, String description, ChannelSemantic semantic, String barrierContributors,
+            String allowedWriters, String adminInstances, Integer rateLimitPerChannel, Integer rateLimitPerInstance,
+            String allowedTypes) {
         Channel channel = new Channel();
         channel.name = name;
         channel.description = description;
@@ -47,6 +55,7 @@ public class ChannelService {
         channel.adminInstances = (adminInstances == null || adminInstances.isBlank()) ? null : adminInstances;
         channel.rateLimitPerChannel = rateLimitPerChannel;
         channel.rateLimitPerInstance = rateLimitPerInstance;
+        channel.allowedTypes = (allowedTypes == null || allowedTypes.isBlank()) ? null : allowedTypes;
         channelStore.put(channel);
         return channel;
     }

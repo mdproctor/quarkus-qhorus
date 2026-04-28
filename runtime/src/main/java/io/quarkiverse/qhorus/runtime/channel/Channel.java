@@ -55,6 +55,14 @@ public class Channel extends PanacheEntityBase {
     @Column(name = "rate_limit_per_instance")
     public Integer rateLimitPerInstance;
 
+    /**
+     * Comma-separated list of permitted MessageType names.
+     * Null means all types are permitted (open channel).
+     * Example: "EVENT" for a telemetry-only observe channel.
+     */
+    @Column(name = "allowed_types", columnDefinition = "TEXT")
+    public String allowedTypes;
+
     /** When true, send_message is blocked and check_messages returns empty + paused status. */
     @Column(nullable = false)
     public boolean paused = false;

@@ -24,6 +24,9 @@ public class MessageService {
     @Inject
     CommitmentService commitmentService;
 
+    @Inject
+    MessageTypePolicy messageTypePolicy;
+
     @Transactional
     public Message send(UUID channelId, String sender, MessageType type, String content,
             String correlationId, Long inReplyTo) {
@@ -39,6 +42,8 @@ public class MessageService {
     @Transactional
     public Message send(UUID channelId, String sender, MessageType type, String content,
             String correlationId, Long inReplyTo, String artefactRefs, String target) {
+        channelService.findById(channelId)
+                .ifPresent(ch -> messageTypePolicy.validate(ch, type));
         Message message = new Message();
         message.channelId = channelId;
         message.sender = sender;

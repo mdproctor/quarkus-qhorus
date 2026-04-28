@@ -106,6 +106,7 @@ classDiagram
         +String description
         +ChannelSemantic semantic
         +Set~String~ barrierContributors
+        +String allowedTypes
         +Instant createdAt
         +Instant lastActivityAt
     }
@@ -118,6 +119,17 @@ classDiagram
 | `BARRIER` | LangGraph `NamedBarrierValue` | Named contributors declared at creation; releases only when all have written. Explicit join gate. |
 | `EPHEMERAL` | LangGraph `EphemeralValue` | Single-hop: visible to next reader only, then cleared. Routing hints, transient context. |
 | `LAST_WRITE` | LangGraph `LastValue` | One authoritative writer; concurrent writes are a protocol error (returns 409). |
+
+### `allowedTypes` and `MessageTypePolicy` SPI
+
+Channels carry an optional `allowedTypes` field — `TEXT nullable; null = all types permitted; comma-separated MessageType names` (e.g. `"EVENT"` or `"QUERY,COMMAND"`). The constraint is enforced at two layers:
+
+1. **MCP tool layer (client):** `send_message` in `QhorusMcpTools` / `ReactiveQhorusMcpTools` checks the policy before delegating to `MessageService`.
+2. **`MessageService` (server):** Safety net for any non-MCP callers. Same SPI, same exception.
+
+The SPI is `MessageTypePolicy` — a `@FunctionalInterface`. The default `StoredMessageTypePolicy` is `@ApplicationScoped` and reads `channel.allowedTypes`. Override with `@Alternative @Priority` to inject custom logic. Violations throw `MessageTypeViolationException` (extends `IllegalStateException`), wrapped by `@WrapBusinessError` at the REST boundary.
+
+See `docs/normative-channel-layout.md` for the canonical 3-channel `NormativeChannelLayout` pattern that uses this feature.
 
 ```mermaid
 sequenceDiagram
@@ -349,7 +361,7 @@ All tools exposed via the single `/mcp` Streamable HTTP endpoint.
 
 | Tool | Description |
 |---|---|
-| `create_channel` | Create a named channel with declared semantic (`APPEND` default). |
+| `create_channel` | Create a named channel with declared semantic (`APPEND` default). Optional `allowed_types` (9th param) restricts which `MessageType` names may be posted — e.g. `"EVENT"` for telemetry-only channels, `"QUERY,COMMAND"` for governance channels. Null = all types permitted. |
 | `list_channels` | All channels with message count, last activity, active senders. |
 | `find_channel` | Keyword search over channel names and descriptions. |
 | `get_channel_digest` | Summary digest of a channel — message count, active senders, last activity. |
@@ -591,6 +603,7 @@ erDiagram
         string description
         string semantic
         string barrier_contributors
+        string allowed_types
         timestamp created_at
         timestamp last_activity_at
     }
@@ -820,6 +833,7 @@ Storing `reply_count` as a denormalized column trades a small write overhead (in
 | **10 — Human-in-the-loop controls** | `pause_channel` / `resume_channel`; `request_approval` (agent-callable, blocks until human responds); external cancellation of pending `wait_for_reply`; force-close BARRIER/COLLECT channels; artefact revocation |
 | **11 — Access control and governance** | Per-channel write permissions (declare allowed `instance_id`s or `capability:tag`s); admin role (a designated instance can pause/resume/close channels on behalf of others); rate limiting per channel or per instance; read-only observer mode (subscribe to events without appearing in the instance registry) |
 | **12 — Normative audit ledger** ✓ | All 9 message types recorded as immutable `MessageLedgerEntry` (SHA-256 hash-chained, JPA JOINED inheritance on quarkus-ledger `LedgerEntry`). Ledger query tools: `list_ledger_entries` (type_filter, sender, correlation_id, sort, after_id, limit, entry_id in output), `get_channel_timeline`, `get_obligation_chain` (participants, handoff count, elapsed, resolution), `get_causal_chain` (walk causedByEntryId to root), `list_stalled_obligations`, `get_obligation_stats` (fulfillment rate per channel), `get_telemetry_summary` (per-tool EVENT aggregation). Causal chain via `caused_by_entry_id`. EVENT entries carry telemetry fields. |
+| **13 — Normative channel layout** ✓ | `allowedTypes` field on `Channel` (TEXT nullable; null = open; comma-separated `MessageType` names). `MessageTypePolicy` SPI (`@FunctionalInterface`; `StoredMessageTypePolicy` default; `@Alternative @Priority` override). `MessageTypeViolationException` (extends `IllegalStateException`). Enforcement at MCP tool layer (`send_message`) and `MessageService`. `create_channel` gains optional `allowed_types` (9th param). `NormativeChannelLayout` 3-channel pattern (`work` / `observe` / `oversight`). `examples/normative-layout/` — deterministic CI tests. See `docs/normative-channel-layout.md`. |
 
 ---
 

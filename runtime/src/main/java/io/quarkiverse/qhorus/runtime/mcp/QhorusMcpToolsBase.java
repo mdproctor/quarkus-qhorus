@@ -48,7 +48,9 @@ public abstract class QhorusMcpToolsBase {
             /** Max messages per minute across all senders. Null = unlimited. */
             Integer rateLimitPerChannel,
             /** Max messages per minute from a single sender. Null = unlimited. */
-            Integer rateLimitPerInstance) {
+            Integer rateLimitPerInstance,
+            /** Comma-separated permitted MessageType names, or null if open to all types. */
+            String allowedTypes) {
     }
 
     public record MessageResult(
@@ -422,7 +424,8 @@ public abstract class QhorusMcpToolsBase {
                 ch.allowedWriters,
                 ch.adminInstances,
                 ch.rateLimitPerChannel,
-                ch.rateLimitPerInstance);
+                ch.rateLimitPerInstance,
+                ch.allowedTypes);
     }
 
     protected WatchdogSummary toWatchdogSummary(Watchdog w) {
