@@ -163,6 +163,18 @@ public class QhorusMcpTools extends QhorusMcpToolsBase {
         return buildInstanceInfoList(instances);
     }
 
+    @Tool(name = "get_instance", description = "Look up a registered instance by its ID. "
+            + "Returns full instance details including capabilities and status. "
+            + "Throws an error if the instance is not found.")
+    @Transactional
+    public InstanceInfo getInstance(
+            @ToolArg(name = "instance_id", description = "Instance ID to look up") String instanceId) {
+        Instance instance = instanceService.findByInstanceId(instanceId)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Instance not found: " + instanceId));
+        return buildInstanceInfoList(java.util.List.of(instance)).get(0);
+    }
+
     // ---------------------------------------------------------------------------
     // Observer tools
     // ---------------------------------------------------------------------------
@@ -807,6 +819,17 @@ public class QhorusMcpTools extends QhorusMcpToolsBase {
                 .filter(m -> isVisibleToReader(m, readerInstanceId,
                         () -> instanceService.findCapabilityTagsForInstance(readerInstanceId)))
                 .map(this::toMessageSummary).toList();
+    }
+
+    @Tool(name = "get_message", description = "Look up a message by its numeric ID. "
+            + "Returns the message summary including content, type, sender, and metadata. "
+            + "Throws an error if the message is not found.")
+    public MessageSummary getMessage(
+            @ToolArg(name = "message_id", description = "Numeric message ID") Long messageId) {
+        Message message = messageService.findById(messageId)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Message not found: " + messageId));
+        return toMessageSummary(message);
     }
 
     // ---------------------------------------------------------------------------
