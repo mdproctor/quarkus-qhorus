@@ -15,11 +15,16 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.quarkiverse.ledger.runtime.config.LedgerConfig;
 import io.quarkiverse.ledger.runtime.model.ActorType;
+import io.quarkiverse.ledger.runtime.model.AttestationVerdict;
+import io.quarkiverse.ledger.runtime.model.LedgerAttestation;
 import io.quarkiverse.ledger.runtime.model.LedgerEntry;
 import io.quarkiverse.ledger.runtime.model.LedgerEntryType;
 import io.quarkiverse.qhorus.runtime.channel.Channel;
+import io.quarkiverse.qhorus.runtime.config.QhorusConfig;
+import io.quarkiverse.qhorus.runtime.message.Commitment;
 import io.quarkiverse.qhorus.runtime.message.Message;
 import io.quarkiverse.qhorus.runtime.message.MessageType;
+import io.quarkiverse.qhorus.runtime.store.CommitmentStore;
 
 /**
  * Writes immutable audit ledger entries for every message sent on a channel.
@@ -53,12 +58,19 @@ public class LedgerWriteService {
 
     private static final Logger LOG = Logger.getLogger(LedgerWriteService.class);
     private static final Set<String> CAUSAL_TYPES = Set.of("DONE", "FAILURE", "DECLINE", "HANDOFF");
+    private static final Set<String> ATTESTATION_TYPES = Set.of("DONE", "FAILURE", "DECLINE");
 
     @Inject
     public MessageLedgerEntryRepository repository;
 
     @Inject
     public LedgerConfig config;
+
+    @Inject
+    public QhorusConfig qhorusConfig;
+
+    @Inject
+    public CommitmentStore commitmentStore;
 
     @Inject
     public ObjectMapper objectMapper;
@@ -111,6 +123,76 @@ public class LedgerWriteService {
         }
 
         repository.save(entry);
+
+        if (ATTESTATION_TYPES.contains(message.messageType.name()) && message.correlationId != null) {
+            writeAttestation(ch, message, entry);
+        }
+    }
+
+    /**
+     * Writes a {@link LedgerAttestation} against the originating COMMAND's
+     * {@link MessageLedgerEntry} when a terminal outcome (DONE, FAILURE, DECLINE) is recorded.
+     *
+     * <p>
+     * DONE → SOUND attestation from the message sender (requester).
+     * FAILURE / DECLINE → FLAGGED attestation from the system.
+     *
+     * <p>
+     * Non-fatal: if no matching COMMAND entry exists, logs WARN and returns.
+     * Runs in the same {@code REQUIRES_NEW} transaction as {@link #record}.
+     */
+    private void writeAttestation(final Channel ch, final Message message,
+            final MessageLedgerEntry outcomeEntry) {
+        // Only attest when a terminal Commitment can be confirmed for this correlationId.
+        final Optional<Commitment> commitment = commitmentStore.findByCorrelationId(message.correlationId);
+        if (commitment.isEmpty() || !commitment.get().state.isTerminal()) {
+            LOG.warnf("No terminal Commitment found for correlationId '%s' — skipping LedgerAttestation",
+                    message.correlationId);
+            return;
+        }
+
+        // Find the originating COMMAND entry to attach the attestation to.
+        final Optional<MessageLedgerEntry> commandEntry = repository.findLatestByCorrelationId(
+                ch.id, message.correlationId);
+        if (commandEntry.isEmpty()) {
+            LOG.warnf(
+                    "No COMMAND ledger entry found for correlationId '%s' on channel %s — skipping LedgerAttestation",
+                    message.correlationId, ch.id);
+            return;
+        }
+
+        final MessageLedgerEntry cmd = commandEntry.get();
+        final LedgerAttestation attestation = new LedgerAttestation();
+        attestation.ledgerEntryId = cmd.id;
+        attestation.subjectId = ch.id;
+
+        switch (message.messageType) {
+            case DONE -> {
+                attestation.verdict = AttestationVerdict.SOUND;
+                attestation.confidence = qhorusConfig.attestation().doneConfidence();
+                attestation.attestorId = message.sender;
+                attestation.attestorType = ActorType.AGENT;
+            }
+            case FAILURE -> {
+                attestation.verdict = AttestationVerdict.FLAGGED;
+                attestation.confidence = qhorusConfig.attestation().failureConfidence();
+                attestation.attestorId = "system";
+                attestation.attestorType = ActorType.SYSTEM;
+            }
+            case DECLINE -> {
+                attestation.verdict = AttestationVerdict.FLAGGED;
+                attestation.confidence = qhorusConfig.attestation().declineConfidence();
+                attestation.attestorId = "system";
+                attestation.attestorType = ActorType.SYSTEM;
+            }
+            default -> {
+                return;
+            }
+        }
+
+        repository.saveAttestation(attestation);
+        LOG.debugf("LedgerAttestation %s written for COMMAND entry %s (correlationId='%s')",
+                attestation.verdict, cmd.id, message.correlationId);
     }
 
     /**

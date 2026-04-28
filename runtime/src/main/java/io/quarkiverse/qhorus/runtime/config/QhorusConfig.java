@@ -20,6 +20,9 @@ public interface QhorusConfig {
     /** Watchdog alerting settings (optional module). */
     Watchdog watchdog();
 
+    /** Attestation confidence values written on terminal commitment outcomes. */
+    Attestation attestation();
+
     /** Reactive dual-stack settings (build-time fixed — read QhorusBuildConfig at build time). */
     Reactive reactive();
 
@@ -81,5 +84,28 @@ public interface QhorusConfig {
         /** Days to retain old messages and shared data before purging. Default: 7. */
         @WithDefault("7")
         int dataRetentionDays();
+    }
+
+    interface Attestation {
+        /**
+         * Confidence score (0.0–1.0) for the SOUND attestation written when a DONE message
+         * closes a COMMAND commitment. Default: 0.7.
+         */
+        @WithDefault("0.7")
+        double doneConfidence();
+
+        /**
+         * Confidence score (0.0–1.0) for the FLAGGED attestation written when a FAILURE
+         * message closes a COMMAND commitment. Default: 0.6.
+         */
+        @WithDefault("0.6")
+        double failureConfidence();
+
+        /**
+         * Confidence score (0.0–1.0) for the FLAGGED attestation written when a DECLINE
+         * message closes a COMMAND commitment. Default: 0.4.
+         */
+        @WithDefault("0.4")
+        double declineConfidence();
     }
 }
