@@ -23,8 +23,6 @@ https://raw.githubusercontent.com/casehubio/casehub-parent/main/docs/repos/quark
 - claudony: `https://raw.githubusercontent.com/casehubio/casehub-parent/main/docs/repos/claudony.md`
 - casehub-connectors: `https://raw.githubusercontent.com/casehubio/casehub-parent/main/docs/repos/casehub-connectors.md`
 
-**Note (2026-04-26):** The `casehub-parent` docs URLs above currently return 404 — the platform docs have been established by the parent/platform Claude but are not yet published to GitHub. Apply the spirit of the protocol manually until they are live: before implementing anything that touches a shared concern (trust models, worker registration, obligation lifecycle, ledger), check whether it already exists in quarkus-ledger, casehub-engine, or quarkus-work. Domain ownership: trust scoring → quarkus-ledger; worker registration as normative act → casehub-engine (ADR-0006); task/work item management → quarkus-work; agent communication + normative ledger → this repo.
-
 ---
 
 ## Project Type
