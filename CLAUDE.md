@@ -93,7 +93,7 @@ quarkus-qhorus/
 │   └── src/main/java/io/quarkiverse/qhorus/runtime/
 │       ├── config/QhorusConfig.java     — @ConfigMapping(prefix = "quarkus.qhorus")
 │       ├── channel/
-│       │   ├── Channel.java             — PanacheEntity
+│       │   ├── Channel.java             — PanacheEntity; `allowedTypes` TEXT nullable — null = open; comma-separated MessageType names enforced by MessageTypePolicy SPI
 │       │   ├── ChannelSemantic.java     — enum: APPEND|COLLECT|BARRIER|EPHEMERAL|LAST_WRITE
 │       │   └── ChannelService.java
 │       ├── message/
@@ -120,8 +120,8 @@ quarkus-qhorus/
 │       │   └── ReactiveLedgerWriteService.java      — @Alternative reactive mirror of LedgerWriteService
 │       ├── mcp/
 │       │   ├── QhorusMcpToolsBase.java  — abstract base: records, mappers (toLedgerEntryMap, toMessageSummary, etc.), validators; ledger query response records (ObligationChainSummary, CausalChainEntry, StalledObligation, ObligationStats, TelemetrySummary, ToolTelemetry)
-│       │   ├── QhorusMcpTools.java      — blocking @Tool methods (~47); @UnlessBuildProperty(reactive.enabled)
-│       │   └── ReactiveQhorusMcpTools.java — reactive @Tool methods returning Uni<T>; @IfBuildProperty(reactive.enabled)
+│       │   ├── QhorusMcpTools.java      — blocking @Tool methods (~47); @UnlessBuildProperty(reactive.enabled); create_channel now accepts allowed_types as 9th optional param
+│       │   └── ReactiveQhorusMcpTools.java — reactive @Tool methods returning Uni<T>; @IfBuildProperty(reactive.enabled); create_channel mirrors allowed_types param
 │       ├── watchdog/
 │       │   ├── Watchdog.java            — PanacheEntity (condition-based alert registrations)
 │       │   ├── WatchdogEvaluationService.java — condition evaluation logic
@@ -138,6 +138,7 @@ quarkus-qhorus/
 ├── testing/                             — InMemory*Store + InMemoryReactive*Store (@Alternative @Priority(1)) for consumer unit tests
 ├── examples/
 │   ├── examples/type-system/            — Fast regression tests for the 9-type taxonomy; runs in CI with no model (MessageTaxonomyTest)
+│   ├── examples/normative-layout/       — Deterministic 3-channel NormativeChannelLayout tests (CI, no LLM); canonical Layer 1 reference
 │   └── examples/agent-communication/    — Real LLM agent examples (Jlama); 3 enterprise scenarios + accuracy baseline; activate with -Pwith-llm-examples
 ├── docs/specs/                          — Design specs
 └── .github/                             — Quarkiverse CI workflows
@@ -171,6 +172,7 @@ JAVA_HOME=/Library/Java/JavaVirtualMachines/graalvm-25.jdk/Contents/Home \
 - Optional modules (`a2a`, `watchdog`) require a `@TestProfile` that sets `quarkus.qhorus.<module>.enabled=true`. Any `@TestProfile` that causes Quarkus to restart must also include the full `quarkus.datasource.qhorus.*` block (db-kind, jdbc.url, username, password) plus `quarkus.datasource.qhorus.reactive=false` and `quarkus.hibernate-orm.qhorus.database.generation=drop-and-create` in `getConfigOverrides()` — Quarkus restarts do not inherit test `application.properties` from prior context.
 - `RateLimiter` and `ObserverRegistry` are `@ApplicationScoped` in-memory beans — their state does NOT roll back with `@TestTransaction`. Use unique channel names and observer IDs per test to avoid cross-test interference.
 - `check_messages` excludes `EVENT` messages by design — never assert EVENT counts via `check_messages`. Use `read_observer_events` (with a registered observer ID) to assert EVENT delivery in tests.
+- `MessageTypePolicy` is injected into both `QhorusMcpTools.sendMessage()` (client-side check) and `MessageService.send()` (server-side safety net). Tests calling `messageService.send()` directly on a channel with `allowedTypes` set will hit the server-side check and receive `MessageTypeViolationException`. The default `StoredMessageTypePolicy` reads `channel.allowedTypes` at call time — no caching.
 - `LedgerWriteService.record(Channel, Message)` is called for **all 9 message types** — not just EVENT. Every `sendMessage` call produces a `MessageLedgerEntry`. EVENT entries extract telemetry from JSON content (`tool_name`, `duration_ms`, `token_count` — all nullable); malformed or missing fields still produce an entry. Tests asserting ledger entries do NOT need structured JSON payloads; any content works.
 - `*Store` interfaces are the persistence seam — six interfaces: `ChannelStore`, `MessageStore`, `InstanceStore`, `DataStore`, `WatchdogStore`, `CommitmentStore` (full obligation lifecycle: OPEN→FULFILLED/DECLINED/FAILED/DELEGATED/EXPIRED). `PendingReplyStore` was deleted — replaced by `CommitmentStore`. Services inject stores, not Panache entity statics. Integration tests (`@QuarkusTest`) inject `*Store` directly; unit tests use `InMemory*Store` from `quarkus-qhorus-testing`.
 - `CommitmentService` unit tests live in `testing/src/test/...` (not `runtime/src/test/...`) to avoid a module cycle — the testing module provides `InMemoryCommitmentStore` used for CDI-free wiring. `service.store = store` sets the dependency directly.
