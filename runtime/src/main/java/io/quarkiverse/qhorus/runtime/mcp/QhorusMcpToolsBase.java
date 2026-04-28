@@ -191,6 +191,12 @@ public abstract class QhorusMcpToolsBase {
             boolean cleared) {
     }
 
+    public record DeleteChannelResult(
+            String channelName,
+            long messagesDeleted,
+            String status) {
+    }
+
     public record DeregisterResult(
             String instanceId,
             boolean deregistered,

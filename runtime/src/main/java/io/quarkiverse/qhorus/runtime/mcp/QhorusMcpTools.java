@@ -379,6 +379,18 @@ public class QhorusMcpTools extends QhorusMcpToolsBase {
         return toChannelDetail(ch, Message.<Message> count("channelId", ch.id));
     }
 
+    @Tool(name = "delete_channel", description = "Delete a named channel. "
+            + "Rejects with an error if the channel has messages unless force=true. "
+            + "When force=true, all messages in the channel are deleted before the channel is removed.")
+    @Transactional
+    public DeleteChannelResult deleteChannel(
+            @ToolArg(name = "channel_name", description = "Name of the channel to delete") String channelName,
+            @ToolArg(name = "force", description = "When true, deletes all messages in the channel then "
+                    + "deletes the channel. When false (default), rejects if messages exist.", required = false) Boolean force) {
+        long deleted = channelService.delete(channelName, Boolean.TRUE.equals(force));
+        return new DeleteChannelResult(channelName, deleted, "deleted");
+    }
+
     /** Convenience overload — no caller identity (open governance assumed). */
     public ForceReleaseResult forceReleaseChannel(String channelName, String reason) {
         return forceReleaseChannel(channelName, reason, null);
