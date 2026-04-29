@@ -20,6 +20,7 @@
   <url>https://github.com/mdproctor/quarkus-qhorus</url>
 
   <modules>
+    <module>api</module>
     <module>runtime</module>
     <module>deployment</module>
     <module>testing</module>

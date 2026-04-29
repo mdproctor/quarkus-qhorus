@@ -4,8 +4,8 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import org.junit.jupiter.api.Test;
 
+import io.quarkiverse.qhorus.api.spi.InstanceActorIdProvider;
 import io.quarkiverse.qhorus.runtime.ledger.DefaultInstanceActorIdProvider;
-import io.quarkiverse.qhorus.runtime.ledger.InstanceActorIdProvider;
 
 class InstanceActorIdProviderTest {
 

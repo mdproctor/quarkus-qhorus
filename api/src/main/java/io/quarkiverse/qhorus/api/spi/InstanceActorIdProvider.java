@@ -1,18 +1,12 @@
-package io.quarkiverse.qhorus.runtime.ledger;
+package io.quarkiverse.qhorus.api.spi;
 
 /**
  * Maps a Qhorus {@code instanceId} (session-scoped, e.g. {@code claudony-worker-abc123}) to
  * a ledger {@code actorId} (persona-scoped, e.g. {@code claude:analyst@v1}).
  *
  * <p>
- * Called in {@link LedgerWriteService#record} and {@link ReactiveLedgerWriteService#record}
- * before writing {@code entry.actorId}. The resolved ID is also passed to
- * {@link CommitmentAttestationPolicy} so DONE attestations carry the persona-scoped attestorId.
- *
- * <p>
- * Default implementation ({@link DefaultInstanceActorIdProvider}) is a no-op identity function.
- * Replace with {@code @Alternative @Priority} to provide session→persona mapping (e.g. in
- * Claudony, which knows the session-to-persona mapping from {@code SessionRegistry}).
+ * Default implementation is a no-op identity function.
+ * Replace with {@code @Alternative @Priority} to provide session-to-persona mapping.
  *
  * <p>
  * Refs #124.

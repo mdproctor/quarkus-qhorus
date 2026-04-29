@@ -9,6 +9,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Alternative;
 import jakarta.inject.Inject;
 
+import io.quarkiverse.qhorus.api.message.MessageType;
 import io.quarkiverse.qhorus.runtime.store.ReactiveChannelStore;
 import io.quarkiverse.qhorus.runtime.store.ReactiveMessageStore;
 import io.quarkiverse.qhorus.runtime.store.query.MessageQuery;

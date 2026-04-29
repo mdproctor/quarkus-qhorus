@@ -11,6 +11,8 @@ import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 
+import io.quarkiverse.qhorus.api.message.CommitmentState;
+import io.quarkiverse.qhorus.api.message.MessageType;
 import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
 
 /**

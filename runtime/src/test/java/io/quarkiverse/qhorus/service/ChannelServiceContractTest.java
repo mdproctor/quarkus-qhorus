@@ -8,8 +8,8 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 
+import io.quarkiverse.qhorus.api.channel.ChannelSemantic;
 import io.quarkiverse.qhorus.runtime.channel.Channel;
-import io.quarkiverse.qhorus.runtime.channel.ChannelSemantic;
 
 public abstract class ChannelServiceContractTest {
 

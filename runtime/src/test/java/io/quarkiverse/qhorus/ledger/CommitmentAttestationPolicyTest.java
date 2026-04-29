@@ -9,11 +9,11 @@ import org.junit.jupiter.api.Test;
 
 import io.quarkiverse.ledger.api.model.ActorType;
 import io.quarkiverse.ledger.api.model.AttestationVerdict;
+import io.quarkiverse.qhorus.api.message.MessageType;
+import io.quarkiverse.qhorus.api.spi.CommitmentAttestationPolicy;
+import io.quarkiverse.qhorus.api.spi.CommitmentAttestationPolicy.AttestationOutcome;
 import io.quarkiverse.qhorus.runtime.config.QhorusConfig;
-import io.quarkiverse.qhorus.runtime.ledger.CommitmentAttestationPolicy;
-import io.quarkiverse.qhorus.runtime.ledger.CommitmentAttestationPolicy.AttestationOutcome;
 import io.quarkiverse.qhorus.runtime.ledger.StoredCommitmentAttestationPolicy;
-import io.quarkiverse.qhorus.runtime.message.MessageType;
 
 class CommitmentAttestationPolicyTest {
 

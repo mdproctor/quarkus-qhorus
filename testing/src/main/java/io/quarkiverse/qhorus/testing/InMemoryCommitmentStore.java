@@ -11,8 +11,8 @@ import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Alternative;
 
+import io.quarkiverse.qhorus.api.message.CommitmentState;
 import io.quarkiverse.qhorus.runtime.message.Commitment;
-import io.quarkiverse.qhorus.runtime.message.CommitmentState;
 import io.quarkiverse.qhorus.runtime.store.CommitmentStore;
 
 @Alternative

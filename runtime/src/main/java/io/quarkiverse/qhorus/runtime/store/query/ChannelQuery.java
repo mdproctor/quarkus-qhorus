@@ -1,7 +1,7 @@
 package io.quarkiverse.qhorus.runtime.store.query;
 
+import io.quarkiverse.qhorus.api.channel.ChannelSemantic;
 import io.quarkiverse.qhorus.runtime.channel.Channel;
-import io.quarkiverse.qhorus.runtime.channel.ChannelSemantic;
 
 public final class ChannelQuery {
 

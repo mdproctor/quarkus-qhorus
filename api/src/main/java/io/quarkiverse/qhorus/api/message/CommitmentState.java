@@ -1,4 +1,4 @@
-package io.quarkiverse.qhorus.runtime.message;
+package io.quarkiverse.qhorus.api.message;
 
 /** Obligation lifecycle state for a QUERY or COMMAND commitment. */
 public enum CommitmentState {

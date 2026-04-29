@@ -10,8 +10,8 @@ import java.util.stream.Collectors;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 
+import io.quarkiverse.qhorus.api.message.MessageType;
 import io.quarkiverse.qhorus.runtime.message.Message;
-import io.quarkiverse.qhorus.runtime.message.MessageType;
 import io.quarkiverse.qhorus.runtime.store.MessageStore;
 import io.quarkiverse.qhorus.runtime.store.query.MessageQuery;
 

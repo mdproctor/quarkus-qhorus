@@ -15,13 +15,13 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 
 import io.quarkiverse.mcp.server.ToolCallException;
+import io.quarkiverse.qhorus.api.message.MessageType;
 import io.quarkiverse.qhorus.runtime.channel.Channel;
 import io.quarkiverse.qhorus.runtime.channel.ChannelService;
 import io.quarkiverse.qhorus.runtime.config.QhorusConfig;
 import io.quarkiverse.qhorus.runtime.mcp.ReactiveQhorusMcpTools;
 import io.quarkiverse.qhorus.runtime.message.Message;
 import io.quarkiverse.qhorus.runtime.message.MessageService;
-import io.quarkiverse.qhorus.runtime.message.MessageType;
 import io.quarkus.arc.properties.IfBuildProperty;
 import io.smallrye.common.annotation.Blocking;
 import io.smallrye.mutiny.Uni;

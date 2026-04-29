@@ -7,8 +7,9 @@ import jakarta.inject.Inject;
 
 import io.quarkiverse.ledger.api.model.ActorType;
 import io.quarkiverse.ledger.api.model.AttestationVerdict;
+import io.quarkiverse.qhorus.api.message.MessageType;
+import io.quarkiverse.qhorus.api.spi.CommitmentAttestationPolicy;
 import io.quarkiverse.qhorus.runtime.config.QhorusConfig;
-import io.quarkiverse.qhorus.runtime.message.MessageType;
 import io.quarkus.arc.DefaultBean;
 
 /**

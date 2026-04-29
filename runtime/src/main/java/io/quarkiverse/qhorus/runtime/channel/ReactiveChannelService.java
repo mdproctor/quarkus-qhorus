@@ -9,6 +9,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Alternative;
 import jakarta.inject.Inject;
 
+import io.quarkiverse.qhorus.api.channel.ChannelSemantic;
 import io.quarkiverse.qhorus.runtime.store.MessageStore;
 import io.quarkiverse.qhorus.runtime.store.ReactiveChannelStore;
 import io.quarkiverse.qhorus.runtime.store.query.ChannelQuery;

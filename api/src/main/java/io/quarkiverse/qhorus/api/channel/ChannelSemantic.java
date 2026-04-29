@@ -1,4 +1,4 @@
-package io.quarkiverse.qhorus.runtime.channel;
+package io.quarkiverse.qhorus.api.channel;
 
 public enum ChannelSemantic {
     /** Ordered accumulation — default for conversation threads. */

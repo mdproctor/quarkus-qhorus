@@ -74,6 +74,13 @@
       <artifactId>quarkus-smallrye-health</artifactId>
     </dependency>
 
+    <!-- Qhorus API — enums, SPI interfaces, exception types -->
+    <dependency>
+      <groupId>io.quarkiverse.qhorus</groupId>
+      <artifactId>quarkus-qhorus-api</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
     <!-- Ledger — structured event audit trail -->
     <dependency>
       <groupId>io.quarkiverse.ledger</groupId>

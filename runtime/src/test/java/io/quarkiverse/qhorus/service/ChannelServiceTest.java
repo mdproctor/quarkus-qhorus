@@ -5,8 +5,8 @@ import java.util.Optional;
 
 import jakarta.inject.Inject;
 
+import io.quarkiverse.qhorus.api.channel.ChannelSemantic;
 import io.quarkiverse.qhorus.runtime.channel.Channel;
-import io.quarkiverse.qhorus.runtime.channel.ChannelSemantic;
 import io.quarkiverse.qhorus.runtime.channel.ChannelService;
 import io.quarkus.test.TestTransaction;
 import io.quarkus.test.junit.QuarkusTest;

@@ -10,6 +10,8 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 
+import io.quarkiverse.qhorus.api.message.CommitmentState;
+import io.quarkiverse.qhorus.api.message.MessageType;
 import io.quarkiverse.qhorus.runtime.store.CommitmentStore;
 
 /**

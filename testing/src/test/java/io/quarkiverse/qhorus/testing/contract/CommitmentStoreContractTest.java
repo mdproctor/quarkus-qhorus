@@ -11,9 +11,9 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import io.quarkiverse.qhorus.api.message.CommitmentState;
+import io.quarkiverse.qhorus.api.message.MessageType;
 import io.quarkiverse.qhorus.runtime.message.Commitment;
-import io.quarkiverse.qhorus.runtime.message.CommitmentState;
-import io.quarkiverse.qhorus.runtime.message.MessageType;
 
 public abstract class CommitmentStoreContractTest {
 

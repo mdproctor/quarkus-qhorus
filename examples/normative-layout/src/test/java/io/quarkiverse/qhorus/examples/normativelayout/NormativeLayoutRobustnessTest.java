@@ -10,17 +10,17 @@ import jakarta.inject.Inject;
 
 import org.junit.jupiter.api.Test;
 
+import io.quarkiverse.qhorus.api.channel.ChannelSemantic;
+import io.quarkiverse.qhorus.api.message.CommitmentState;
+import io.quarkiverse.qhorus.api.message.MessageType;
+import io.quarkiverse.qhorus.api.message.MessageTypeViolationException;
 import io.quarkiverse.qhorus.runtime.channel.Channel;
-import io.quarkiverse.qhorus.runtime.channel.ChannelSemantic;
 import io.quarkiverse.qhorus.runtime.channel.ChannelService;
 import io.quarkiverse.qhorus.runtime.data.DataService;
 import io.quarkiverse.qhorus.runtime.instance.InstanceService;
 import io.quarkiverse.qhorus.runtime.message.Commitment;
-import io.quarkiverse.qhorus.runtime.message.CommitmentState;
 import io.quarkiverse.qhorus.runtime.message.Message;
 import io.quarkiverse.qhorus.runtime.message.MessageService;
-import io.quarkiverse.qhorus.runtime.message.MessageType;
-import io.quarkiverse.qhorus.runtime.message.MessageTypeViolationException;
 import io.quarkiverse.qhorus.runtime.store.CommitmentStore;
 import io.quarkiverse.qhorus.runtime.store.MessageStore;
 import io.quarkiverse.qhorus.runtime.store.query.MessageQuery;

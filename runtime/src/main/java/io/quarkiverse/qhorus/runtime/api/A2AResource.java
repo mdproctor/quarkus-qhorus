@@ -16,13 +16,13 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 
 import io.quarkiverse.mcp.server.ToolCallException;
+import io.quarkiverse.qhorus.api.message.MessageType;
 import io.quarkiverse.qhorus.runtime.channel.Channel;
 import io.quarkiverse.qhorus.runtime.channel.ChannelService;
 import io.quarkiverse.qhorus.runtime.config.QhorusConfig;
 import io.quarkiverse.qhorus.runtime.mcp.QhorusMcpTools;
 import io.quarkiverse.qhorus.runtime.message.Message;
 import io.quarkiverse.qhorus.runtime.message.MessageService;
-import io.quarkiverse.qhorus.runtime.message.MessageType;
 import io.quarkus.arc.properties.UnlessBuildProperty;
 
 /**

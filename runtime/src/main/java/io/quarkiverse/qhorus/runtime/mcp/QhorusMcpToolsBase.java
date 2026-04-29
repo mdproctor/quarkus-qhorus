@@ -5,11 +5,11 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.function.Supplier;
 
+import io.quarkiverse.qhorus.api.message.MessageType;
 import io.quarkiverse.qhorus.runtime.channel.Channel;
 import io.quarkiverse.qhorus.runtime.data.SharedData;
 import io.quarkiverse.qhorus.runtime.ledger.MessageLedgerEntry;
 import io.quarkiverse.qhorus.runtime.message.Message;
-import io.quarkiverse.qhorus.runtime.message.MessageType;
 import io.quarkiverse.qhorus.runtime.watchdog.Watchdog;
 
 public abstract class QhorusMcpToolsBase {

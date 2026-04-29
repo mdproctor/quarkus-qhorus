@@ -12,14 +12,14 @@ import jakarta.inject.Inject;
 import org.eclipse.microprofile.context.ManagedExecutor;
 import org.junit.jupiter.api.Test;
 
-import io.quarkiverse.qhorus.runtime.channel.ChannelSemantic;
+import io.quarkiverse.qhorus.api.channel.ChannelSemantic;
+import io.quarkiverse.qhorus.api.message.MessageType;
 import io.quarkiverse.qhorus.runtime.channel.ChannelService;
 import io.quarkiverse.qhorus.runtime.mcp.QhorusMcpTools;
 import io.quarkiverse.qhorus.runtime.mcp.QhorusMcpToolsBase.CommitmentDetail;
 import io.quarkiverse.qhorus.runtime.message.Commitment;
 import io.quarkiverse.qhorus.runtime.message.Message;
 import io.quarkiverse.qhorus.runtime.message.MessageService;
-import io.quarkiverse.qhorus.runtime.message.MessageType;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.TestTransaction;
 import io.quarkus.test.junit.QuarkusTest;

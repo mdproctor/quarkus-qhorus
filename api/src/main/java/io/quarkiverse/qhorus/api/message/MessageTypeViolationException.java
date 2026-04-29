@@ -1,4 +1,4 @@
-package io.quarkiverse.qhorus.runtime.message;
+package io.quarkiverse.qhorus.api.message;
 
 public class MessageTypeViolationException extends IllegalStateException {
 

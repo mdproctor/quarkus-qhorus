@@ -6,9 +6,9 @@ import java.util.UUID;
 
 import jakarta.inject.Inject;
 
+import io.quarkiverse.qhorus.api.message.MessageType;
 import io.quarkiverse.qhorus.runtime.message.Message;
 import io.quarkiverse.qhorus.runtime.message.MessageService;
-import io.quarkiverse.qhorus.runtime.message.MessageType;
 import io.quarkus.test.TestTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 

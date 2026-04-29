@@ -9,11 +9,11 @@ import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
 
 import io.quarkiverse.mcp.server.ToolCallException;
+import io.quarkiverse.qhorus.api.message.MessageType;
 import io.quarkiverse.qhorus.runtime.channel.Channel;
 import io.quarkiverse.qhorus.runtime.mcp.QhorusMcpTools;
 import io.quarkiverse.qhorus.runtime.mcp.QhorusMcpToolsBase.ChannelDetail;
 import io.quarkiverse.qhorus.runtime.message.MessageService;
-import io.quarkiverse.qhorus.runtime.message.MessageType;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.TestTransaction;
 import io.quarkus.test.junit.QuarkusTest;

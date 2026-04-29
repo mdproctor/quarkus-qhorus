@@ -1,5 +1,7 @@
 package io.quarkiverse.qhorus.runtime.message;
 
+import io.quarkiverse.qhorus.api.message.MessageType;
+import io.quarkiverse.qhorus.api.message.MessageTypeViolationException;
 import io.quarkiverse.qhorus.runtime.channel.Channel;
 
 @FunctionalInterface

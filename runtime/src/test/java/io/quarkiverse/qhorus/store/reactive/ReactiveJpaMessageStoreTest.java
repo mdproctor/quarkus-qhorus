@@ -9,8 +9,8 @@ import jakarta.inject.Inject;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
+import io.quarkiverse.qhorus.api.message.MessageType;
 import io.quarkiverse.qhorus.runtime.message.Message;
-import io.quarkiverse.qhorus.runtime.message.MessageType;
 import io.quarkiverse.qhorus.runtime.store.ReactiveMessageStore;
 import io.quarkiverse.qhorus.runtime.store.query.MessageQuery;
 import io.quarkus.hibernate.reactive.panache.Panache;

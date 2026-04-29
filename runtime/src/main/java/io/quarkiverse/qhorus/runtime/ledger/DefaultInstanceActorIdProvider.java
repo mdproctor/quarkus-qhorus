@@ -2,6 +2,7 @@ package io.quarkiverse.qhorus.runtime.ledger;
 
 import jakarta.enterprise.context.ApplicationScoped;
 
+import io.quarkiverse.qhorus.api.spi.InstanceActorIdProvider;
 import io.quarkus.arc.DefaultBean;
 
 /**

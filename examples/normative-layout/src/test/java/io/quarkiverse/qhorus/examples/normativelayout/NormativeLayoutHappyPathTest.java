@@ -9,12 +9,12 @@ import jakarta.inject.Inject;
 
 import org.junit.jupiter.api.Test;
 
+import io.quarkiverse.qhorus.api.message.MessageType;
 import io.quarkiverse.qhorus.runtime.channel.ChannelService;
 import io.quarkiverse.qhorus.runtime.data.DataService;
 import io.quarkiverse.qhorus.runtime.instance.InstanceService;
 import io.quarkiverse.qhorus.runtime.message.Message;
 import io.quarkiverse.qhorus.runtime.message.MessageService;
-import io.quarkiverse.qhorus.runtime.message.MessageType;
 import io.quarkiverse.qhorus.runtime.store.MessageStore;
 import io.quarkiverse.qhorus.runtime.store.query.MessageQuery;
 import io.quarkus.narayana.jta.QuarkusTransaction;

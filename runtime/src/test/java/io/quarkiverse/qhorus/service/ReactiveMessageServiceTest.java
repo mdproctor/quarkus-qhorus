@@ -8,8 +8,8 @@ import jakarta.inject.Inject;
 
 import org.junit.jupiter.api.Disabled;
 
+import io.quarkiverse.qhorus.api.message.MessageType;
 import io.quarkiverse.qhorus.runtime.message.Message;
-import io.quarkiverse.qhorus.runtime.message.MessageType;
 import io.quarkiverse.qhorus.runtime.message.ReactiveMessageService;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.TestProfile;

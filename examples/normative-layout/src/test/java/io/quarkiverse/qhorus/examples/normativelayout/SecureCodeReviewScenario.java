@@ -2,14 +2,14 @@ package io.quarkiverse.qhorus.examples.normativelayout;
 
 import java.util.List;
 
+import io.quarkiverse.qhorus.api.channel.ChannelSemantic;
+import io.quarkiverse.qhorus.api.message.MessageType;
 import io.quarkiverse.qhorus.runtime.channel.Channel;
-import io.quarkiverse.qhorus.runtime.channel.ChannelSemantic;
 import io.quarkiverse.qhorus.runtime.channel.ChannelService;
 import io.quarkiverse.qhorus.runtime.data.DataService;
 import io.quarkiverse.qhorus.runtime.instance.InstanceService;
 import io.quarkiverse.qhorus.runtime.message.Message;
 import io.quarkiverse.qhorus.runtime.message.MessageService;
-import io.quarkiverse.qhorus.runtime.message.MessageType;
 
 /**
  * Canonical Layer 1 Secure Code Review scenario.

@@ -15,9 +15,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.quarkiverse.ledger.api.model.ActorType;
 import io.quarkiverse.ledger.api.model.LedgerEntryType;
 import io.quarkiverse.ledger.runtime.config.LedgerConfig;
+import io.quarkiverse.qhorus.api.message.MessageType;
+import io.quarkiverse.qhorus.api.spi.CommitmentAttestationPolicy;
+import io.quarkiverse.qhorus.api.spi.InstanceActorIdProvider;
 import io.quarkiverse.qhorus.runtime.channel.Channel;
 import io.quarkiverse.qhorus.runtime.message.Message;
-import io.quarkiverse.qhorus.runtime.message.MessageType;
 import io.quarkus.hibernate.reactive.panache.Panache;
 import io.smallrye.mutiny.Uni;
 

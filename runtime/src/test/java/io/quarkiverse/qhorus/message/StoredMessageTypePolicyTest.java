@@ -4,10 +4,10 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import org.junit.jupiter.api.Test;
 
+import io.quarkiverse.qhorus.api.channel.ChannelSemantic;
+import io.quarkiverse.qhorus.api.message.MessageType;
+import io.quarkiverse.qhorus.api.message.MessageTypeViolationException;
 import io.quarkiverse.qhorus.runtime.channel.Channel;
-import io.quarkiverse.qhorus.runtime.channel.ChannelSemantic;
-import io.quarkiverse.qhorus.runtime.message.MessageType;
-import io.quarkiverse.qhorus.runtime.message.MessageTypeViolationException;
 import io.quarkiverse.qhorus.runtime.message.StoredMessageTypePolicy;
 
 class StoredMessageTypePolicyTest {

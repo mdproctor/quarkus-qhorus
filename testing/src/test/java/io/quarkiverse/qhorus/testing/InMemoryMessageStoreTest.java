@@ -9,8 +9,8 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 
+import io.quarkiverse.qhorus.api.message.MessageType;
 import io.quarkiverse.qhorus.runtime.message.Message;
-import io.quarkiverse.qhorus.runtime.message.MessageType;
 import io.quarkiverse.qhorus.runtime.store.query.MessageQuery;
 import io.quarkiverse.qhorus.testing.contract.MessageStoreContractTest;
 

@@ -6,6 +6,8 @@ import java.util.stream.Collectors;
 
 import jakarta.enterprise.context.ApplicationScoped;
 
+import io.quarkiverse.qhorus.api.message.MessageType;
+import io.quarkiverse.qhorus.api.message.MessageTypeViolationException;
 import io.quarkiverse.qhorus.runtime.channel.Channel;
 
 @ApplicationScoped

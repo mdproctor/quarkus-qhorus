@@ -21,15 +21,15 @@ import io.quarkiverse.ledger.api.model.LedgerEntryType;
 import io.quarkiverse.ledger.runtime.config.LedgerConfig;
 import io.quarkiverse.ledger.runtime.model.LedgerAttestation;
 import io.quarkiverse.ledger.runtime.model.LedgerEntry;
+import io.quarkiverse.qhorus.api.message.MessageType;
+import io.quarkiverse.qhorus.api.spi.CommitmentAttestationPolicy;
+import io.quarkiverse.qhorus.api.spi.CommitmentAttestationPolicy.AttestationOutcome;
+import io.quarkiverse.qhorus.api.spi.InstanceActorIdProvider;
 import io.quarkiverse.qhorus.runtime.channel.Channel;
-import io.quarkiverse.qhorus.runtime.ledger.CommitmentAttestationPolicy;
-import io.quarkiverse.qhorus.runtime.ledger.CommitmentAttestationPolicy.AttestationOutcome;
-import io.quarkiverse.qhorus.runtime.ledger.InstanceActorIdProvider;
 import io.quarkiverse.qhorus.runtime.ledger.LedgerWriteService;
 import io.quarkiverse.qhorus.runtime.ledger.MessageLedgerEntry;
 import io.quarkiverse.qhorus.runtime.ledger.MessageLedgerEntryRepository;
 import io.quarkiverse.qhorus.runtime.message.Message;
-import io.quarkiverse.qhorus.runtime.message.MessageType;
 
 /**
  * Pure unit tests for {@link LedgerWriteService#record} — no Quarkus runtime.

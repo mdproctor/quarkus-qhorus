@@ -1,4 +1,4 @@
-package io.quarkiverse.qhorus.runtime.message;
+package io.quarkiverse.qhorus.api.message;
 
 public enum MessageType {
     /** Ask for information. Receiver must RESPONSE or DECLINE. Carries correlation_id. */

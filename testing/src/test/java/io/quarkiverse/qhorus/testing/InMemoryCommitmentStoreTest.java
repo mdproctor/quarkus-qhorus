@@ -5,8 +5,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import io.quarkiverse.qhorus.api.message.CommitmentState;
 import io.quarkiverse.qhorus.runtime.message.Commitment;
-import io.quarkiverse.qhorus.runtime.message.CommitmentState;
 import io.quarkiverse.qhorus.testing.contract.CommitmentStoreContractTest;
 
 class InMemoryCommitmentStoreTest extends CommitmentStoreContractTest {

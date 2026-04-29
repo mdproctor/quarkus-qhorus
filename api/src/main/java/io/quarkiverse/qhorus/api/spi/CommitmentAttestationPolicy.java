@@ -1,26 +1,17 @@
-package io.quarkiverse.qhorus.runtime.ledger;
+package io.quarkiverse.qhorus.api.spi;
 
 import java.util.Optional;
 
 import io.quarkiverse.ledger.api.model.ActorType;
 import io.quarkiverse.ledger.api.model.AttestationVerdict;
-import io.quarkiverse.qhorus.runtime.message.MessageType;
+import io.quarkiverse.qhorus.api.message.MessageType;
 
 /**
- * Determines what {@link io.quarkiverse.ledger.runtime.model.LedgerAttestation} to write
- * when a terminal message (DONE, FAILURE, DECLINE) discharges a commitment.
- *
- * <p>
- * Called in {@link LedgerWriteService#record} for DONE, FAILURE, and DECLINE message types
- * when a prior COMMAND ledger entry exists for the same correlationId. The returned
- * {@link AttestationOutcome} is written against the COMMAND's {@code MessageLedgerEntry}.
+ * Determines what attestation to write when a terminal message (DONE, FAILURE, DECLINE)
+ * discharges a commitment.
  *
  * <p>
  * Returning {@link Optional#empty()} suppresses attestation writing for that message type.
- *
- * <p>
- * Default implementation: {@link StoredCommitmentAttestationPolicy}.
- * Replace with {@code @Alternative @Priority} for custom verdict mappings.
  *
  * <p>
  * Refs #123.
@@ -45,7 +36,7 @@ public interface CommitmentAttestationPolicy {
      * @param verdict SOUND for positive outcomes, FLAGGED for negative; feeds the
      *        Bayesian Beta trust score in quarkus-ledger
      * @param confidence strength of evidence in [0.0, 1.0]; the Beta update is weighted by
-     *        {@code recencyWeight × confidence} — higher values move the score more
+     *        {@code recencyWeight x confidence} — higher values move the score more
      * @param attestorId the actor making the attestation (sender for DONE, "system" for others)
      * @param attestorType AGENT or SYSTEM
      */

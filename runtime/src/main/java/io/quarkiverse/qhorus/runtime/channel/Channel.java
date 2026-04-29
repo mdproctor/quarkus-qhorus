@@ -12,6 +12,7 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 
+import io.quarkiverse.qhorus.api.channel.ChannelSemantic;
 import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
 
 @Entity

@@ -14,6 +14,7 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
 
+import io.quarkiverse.qhorus.api.message.MessageType;
 import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
 
 @Entity

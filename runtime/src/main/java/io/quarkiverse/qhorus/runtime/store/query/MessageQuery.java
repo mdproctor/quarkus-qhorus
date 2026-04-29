@@ -3,8 +3,8 @@ package io.quarkiverse.qhorus.runtime.store.query;
 import java.util.List;
 import java.util.UUID;
 
+import io.quarkiverse.qhorus.api.message.MessageType;
 import io.quarkiverse.qhorus.runtime.message.Message;
-import io.quarkiverse.qhorus.runtime.message.MessageType;
 
 public final class MessageQuery {
 
