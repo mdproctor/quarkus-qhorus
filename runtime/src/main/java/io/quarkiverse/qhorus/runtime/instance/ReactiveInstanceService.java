@@ -20,18 +20,24 @@ public class ReactiveInstanceService {
     @Inject
     ReactiveInstanceStore instanceStore;
 
-    /** Convenience overload — no claudony session. */
+    /** Convenience overload — no claudony session, not read-only. */
     public Uni<Instance> register(String instanceId, String description, List<String> capabilityTags) {
-        return register(instanceId, description, capabilityTags, null);
+        return register(instanceId, description, capabilityTags, null, false);
+    }
+
+    /** Convenience overload — not read-only. */
+    public Uni<Instance> register(String instanceId, String description, List<String> capabilityTags,
+            String claudonySessionId) {
+        return register(instanceId, description, capabilityTags, claudonySessionId, false);
     }
 
     /**
      * Register or update an instance. Creates if not found; updates description,
-     * status, lastSeen, and claudonySessionId if already present.
+     * status, lastSeen, claudonySessionId, and readOnly if already present.
      * Replaces capability tags on every call — no stale tags accumulate.
      */
     public Uni<Instance> register(String instanceId, String description, List<String> capabilityTags,
-            String claudonySessionId) {
+            String claudonySessionId, boolean readOnly) {
         return Panache.withTransaction(() -> instanceStore.findByInstanceId(instanceId).flatMap(opt -> {
             Instance instance = opt.orElse(null);
             if (instance == null) {
@@ -42,6 +48,7 @@ public class ReactiveInstanceService {
             instance.status = "online";
             instance.lastSeen = Instant.now();
             instance.claudonySessionId = claudonySessionId;
+            instance.readOnly = readOnly;
 
             final Instance toSave = instance;
             return instanceStore.put(toSave)

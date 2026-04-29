@@ -88,9 +88,6 @@ public class ReactiveQhorusMcpTools extends QhorusMcpToolsBase {
     @Inject
     io.quarkiverse.qhorus.runtime.channel.RateLimiter rateLimiter;
 
-    @Inject
-    io.quarkiverse.qhorus.runtime.instance.ObserverRegistry observerRegistry;
-
     // Blocking services (Category B @Blocking tools)
     @Inject
     io.quarkiverse.qhorus.runtime.channel.ChannelService blockingChannelService;
@@ -118,14 +115,17 @@ public class ReactiveQhorusMcpTools extends QhorusMcpToolsBase {
     // ---------------------------------------------------------------------------
 
     @Tool(name = "register", description = "Register an agent instance with capability tags. "
+            + "Set read_only=true for dashboard/observer instances that only read EVENT messages. "
             + "Returns active channels and online instances as immediate context.")
     public Uni<RegisterResponse> register(
             @ToolArg(name = "instance_id", description = "Unique human-readable identifier for this agent") String instanceId,
             @ToolArg(name = "description", description = "Description of this agent's role") String description,
             @ToolArg(name = "capabilities", description = "Capability tags for peer discovery", required = false) List<String> capabilities,
-            @ToolArg(name = "claudony_session_id", description = "Optional Claudony session ID for managed workers", required = false) String claudonySessionId) {
+            @ToolArg(name = "claudony_session_id", description = "Optional Claudony session ID for managed workers", required = false) String claudonySessionId,
+            @ToolArg(name = "read_only", description = "If true, instance is read-only: cannot send messages, and check_messages with include_events=true returns EVENT messages. Default false.", required = false) Boolean readOnly) {
         List<String> caps = capabilities != null ? capabilities : List.of();
-        return instanceService.register(instanceId, description, caps, claudonySessionId)
+        boolean ro = readOnly != null && readOnly;
+        return instanceService.register(instanceId, description, caps, claudonySessionId, ro)
                 .flatMap(instance -> channelService.listAll()
                         .flatMap(channels -> instanceService.listAll()
                                 .flatMap(instances -> buildInstanceInfoListReactive(instances)
@@ -148,34 +148,7 @@ public class ReactiveQhorusMcpTools extends QhorusMcpToolsBase {
         return source.flatMap(this::buildInstanceInfoListReactive);
     }
 
-    // ---------------------------------------------------------------------------
-    // Category A: Observer tools
-    // ---------------------------------------------------------------------------
-
-    @Tool(name = "register_observer", description = "Subscribe a read-only observer to event messages on one or more channels. "
-            + "Observers receive EVENT messages without joining the instance registry — "
-            + "they are invisible to agents and cannot send messages. "
-            + "Observer registrations are in-memory and reset on restart.")
-    public Uni<ObserverRegistration> registerObserver(
-            @ToolArg(name = "observer_id", description = "Unique observer identifier (use a distinct namespace from instance IDs, e.g. 'dashboard', 'monitor-1')") String observerId,
-            @ToolArg(name = "channel_names", description = "List of channel names to subscribe to") List<String> channelNames) {
-        return Uni.createFrom().item(() -> {
-            observerRegistry.register(observerId, channelNames);
-            return new ObserverRegistration(observerId, observerRegistry.getSubscriptions(observerId));
-        });
-    }
-
-    @Tool(name = "deregister_observer", description = "Remove an observer subscription. "
-            + "After deregistration the ID is no longer treated as an observer.")
-    public Uni<DeregisterObserverResult> deregisterObserver(
-            @ToolArg(name = "observer_id", description = "Observer ID to remove") String observerId) {
-        return Uni.createFrom().item(() -> {
-            boolean removed = observerRegistry.deregister(observerId);
-            return new DeregisterObserverResult(observerId, removed,
-                    removed ? "Observer '" + observerId + "' deregistered."
-                            : "Observer '" + observerId + "' was not registered.");
-        });
-    }
+    // (Observer tools removed — replaced by read_only flag on Instance)
 
     // ---------------------------------------------------------------------------
     // Category A: Channel tools
@@ -448,7 +421,7 @@ public class ReactiveQhorusMcpTools extends QhorusMcpToolsBase {
         return Multi.createFrom().iterable(instances)
                 .onItem().transformToUniAndConcatenate(i -> instanceService.findCapabilityTagsForInstance(i.instanceId)
                         .map(tags -> new InstanceInfo(i.instanceId, i.description, i.status, tags,
-                                i.lastSeen.toString())))
+                                i.lastSeen.toString(), i.readOnly)))
                 .collect().asList();
     }
 
@@ -462,46 +435,6 @@ public class ReactiveQhorusMcpTools extends QhorusMcpToolsBase {
     // ---------------------------------------------------------------------------
     // Category B: @Blocking tools (Task 2)
     // ---------------------------------------------------------------------------
-
-    // 1. read_observer_events
-    @Tool(name = "read_observer_events", description = "Read EVENT messages from a subscribed channel as a registered observer. "
-            + "Only returns EVENT-type messages. Supports cursor-based pagination via after_id.")
-    @Transactional
-    @Blocking
-    public Uni<CheckResult> readObserverEvents(
-            @ToolArg(name = "observer_id", description = "Registered observer ID") String observerId,
-            @ToolArg(name = "channel_name", description = "Channel name to read from (must be in observer's subscription list)") String channelName,
-            @ToolArg(name = "after_id", description = "Return messages with ID greater than this value (0 for all)", required = false) Long afterId,
-            @ToolArg(name = "limit", description = "Max messages to return", required = false) Integer limit) {
-        return Uni.createFrom().item(() -> blockingReadObserverEvents(observerId, channelName, afterId, limit));
-    }
-
-    private CheckResult blockingReadObserverEvents(String observerId, String channelName, Long afterId, Integer limit) {
-        if (!observerRegistry.isObserver(observerId)) {
-            throw new IllegalArgumentException(
-                    "Observer '" + observerId + "' is not registered. Call register_observer first.");
-        }
-        if (!observerRegistry.isSubscribedTo(observerId, channelName)) {
-            throw new IllegalArgumentException(
-                    "Observer '" + observerId + "' is not subscribed to channel '" + channelName
-                            + "'. Re-register with the channel included.");
-        }
-        Channel ch = blockingChannelService.findByName(channelName)
-                .orElseThrow(() -> new IllegalArgumentException("Channel not found: " + channelName));
-
-        long cursor = afterId != null ? afterId : 0L;
-        int pageSize = (limit != null && limit > 0) ? limit : 50;
-
-        List<Message> events = Message.<Message> find(
-                "channelId = ?1 AND messageType = ?2 AND id > ?3 ORDER BY id ASC",
-                ch.id, MessageType.EVENT, cursor)
-                .page(0, pageSize)
-                .list();
-
-        Long lastId = events.isEmpty() ? cursor : events.get(events.size() - 1).id;
-        List<MessageSummary> summaries = events.stream().map(this::toMessageSummary).toList();
-        return new CheckResult(summaries, lastId, null);
-    }
 
     // 2. force_release_channel
     @Tool(name = "force_release_channel", description = "Force-deliver all accumulated messages and clear a BARRIER or COLLECT channel, "
@@ -574,12 +507,14 @@ public class ReactiveQhorusMcpTools extends QhorusMcpToolsBase {
                     "Channel '" + channelName + "' is paused — send_message blocked. Use resume_channel to re-enable.");
         }
 
-        // Observer check — registered observers are read-only and cannot send any messages
-        if (observerRegistry.isObserver(sender)) {
-            throw new IllegalStateException(
-                    "Observer '" + sender + "' is read-only and cannot send messages. "
-                            + "Use read_observer_events to receive EVENT messages.");
-        }
+        // Read-only instance check — read_only instances cannot send any messages
+        blockingInstanceService.findByInstanceId(sender).ifPresent(inst -> {
+            if (inst.readOnly) {
+                throw new IllegalStateException(
+                        "Instance '" + sender + "' is read-only and cannot send messages. "
+                                + "Use check_messages with include_events=true to receive EVENT messages.");
+            }
+        });
 
         MessageType msgType = MessageType.valueOf(type.toUpperCase());
 
@@ -721,7 +656,9 @@ public class ReactiveQhorusMcpTools extends QhorusMcpToolsBase {
 
     // 4. check_messages
     @Tool(name = "check_messages", description = "Poll for messages on a channel after a given cursor ID. "
-            + "Excludes EVENT type. Returns messages and last_id for subsequent polling. "
+            + "Excludes EVENT type by default — set include_events=true to receive EVENT messages "
+            + "(intended for read_only instances acting as dashboards/observers). "
+            + "Returns messages and last_id for subsequent polling. "
             + "Behaviour varies by channel semantic: EPHEMERAL deletes on read, "
             + "COLLECT delivers all and clears, BARRIER blocks until all contributors have written.")
     @Transactional
@@ -732,12 +669,15 @@ public class ReactiveQhorusMcpTools extends QhorusMcpToolsBase {
             @ToolArg(name = "limit", description = "Maximum messages to return (default 20)", required = false) Integer limit,
             @ToolArg(name = "sender", description = "Filter by sender (optional)", required = false) String sender,
             @ToolArg(name = "reader_instance_id", description = "Calling agent's instance ID for target filtering. "
-                    + "When provided, only broadcast (null target) and instance:<reader> messages are returned.", required = false) String readerInstanceId) {
-        return Uni.createFrom().item(() -> blockingCheckMessages(channelName, afterId, limit, sender, readerInstanceId));
+                    + "When provided, only broadcast (null target) and instance:<reader> messages are returned.", required = false) String readerInstanceId,
+            @ToolArg(name = "include_events", description = "If true, include EVENT messages in results (default false). "
+                    + "Used by read_only instances to receive telemetry events.", required = false) Boolean includeEvents) {
+        return Uni.createFrom()
+                .item(() -> blockingCheckMessages(channelName, afterId, limit, sender, readerInstanceId, includeEvents));
     }
 
     private CheckResult blockingCheckMessages(String channelName, Long afterId, Integer limit, String sender,
-            String readerInstanceId) {
+            String readerInstanceId, Boolean includeEvents) {
         Channel ch = blockingChannelService.findByName(channelName)
                 .orElseThrow(() -> new IllegalArgumentException("Channel not found: " + channelName));
 
@@ -747,12 +687,13 @@ public class ReactiveQhorusMcpTools extends QhorusMcpToolsBase {
 
         long cursor = afterId != null ? afterId : 0L;
         int pageSize = limit != null ? limit : 20;
+        boolean events = includeEvents != null && includeEvents;
 
         return switch (ch.semantic) {
             case EPHEMERAL -> blockingCheckMessagesEphemeral(ch, cursor, pageSize, readerInstanceId);
             case COLLECT -> blockingCheckMessagesCollect(ch, readerInstanceId);
             case BARRIER -> blockingCheckMessagesBarrier(ch, readerInstanceId);
-            default -> blockingCheckMessagesAppend(ch, cursor, pageSize, sender, readerInstanceId);
+            default -> blockingCheckMessagesAppend(ch, cursor, pageSize, sender, readerInstanceId, events);
         };
     }
 
@@ -822,10 +763,10 @@ public class ReactiveQhorusMcpTools extends QhorusMcpToolsBase {
     }
 
     private CheckResult blockingCheckMessagesAppend(Channel ch, long cursor, int pageSize, String sender,
-            String readerInstanceId) {
+            String readerInstanceId, boolean includeEvents) {
         List<Message> messages = (sender != null && !sender.isBlank())
-                ? blockingMessageService.pollAfterBySender(ch.id, cursor, pageSize, sender)
-                : blockingMessageService.pollAfter(ch.id, cursor, pageSize);
+                ? blockingMessageService.pollAfterBySender(ch.id, cursor, pageSize, sender, includeEvents)
+                : blockingMessageService.pollAfter(ch.id, cursor, pageSize, includeEvents);
         List<MessageSummary> summaries = messages.stream()
                 .filter(m -> isVisibleToReader(m, readerInstanceId,
                         () -> blockingInstanceService.findCapabilityTagsForInstance(readerInstanceId)))
@@ -1286,7 +1227,7 @@ public class ReactiveQhorusMcpTools extends QhorusMcpToolsBase {
                 .map(i -> {
                     List<String> tags = blockingInstanceService.findCapabilityTagsForInstance(i.instanceId);
                     return new InstanceInfo(i.instanceId, i.description, i.status, tags,
-                            i.lastSeen.toString());
+                            i.lastSeen.toString(), i.readOnly);
                 })
                 .toList();
     }

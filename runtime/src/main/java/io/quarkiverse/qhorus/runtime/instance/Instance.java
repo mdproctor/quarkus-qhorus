@@ -34,6 +34,9 @@ public class Instance extends PanacheEntityBase {
     @Column(name = "session_token")
     public String sessionToken;
 
+    @Column(name = "read_only", nullable = false)
+    public boolean readOnly;
+
     @Column(name = "last_seen", nullable = false)
     public Instant lastSeen;
 

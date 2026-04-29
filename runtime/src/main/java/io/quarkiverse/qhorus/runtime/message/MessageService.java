@@ -90,13 +90,22 @@ public class MessageService {
      * (observer-only — not delivered to agent context).
      */
     public List<Message> pollAfter(UUID channelId, Long afterId, int limit) {
-        return messageStore.scan(
-                MessageQuery.builder()
-                        .channelId(channelId)
-                        .afterId(afterId)
-                        .limit(limit)
-                        .excludeTypes(List.of(MessageType.EVENT))
-                        .build());
+        return pollAfter(channelId, afterId, limit, false);
+    }
+
+    /**
+     * Returns messages in channel posted after {@code afterId}. If {@code includeEvents}
+     * is true, EVENT messages are included (for read-only observer instances).
+     */
+    public List<Message> pollAfter(UUID channelId, Long afterId, int limit, boolean includeEvents) {
+        MessageQuery.Builder builder = MessageQuery.builder()
+                .channelId(channelId)
+                .afterId(afterId)
+                .limit(limit);
+        if (!includeEvents) {
+            builder.excludeTypes(List.of(MessageType.EVENT));
+        }
+        return messageStore.scan(builder.build());
     }
 
     /**
@@ -104,14 +113,23 @@ public class MessageService {
      * post-limit filtering bug where messages are lost when limit < total results.
      */
     public List<Message> pollAfterBySender(UUID channelId, Long afterId, int limit, String sender) {
-        return messageStore.scan(
-                MessageQuery.builder()
-                        .channelId(channelId)
-                        .afterId(afterId)
-                        .limit(limit)
-                        .excludeTypes(List.of(MessageType.EVENT))
-                        .sender(sender)
-                        .build());
+        return pollAfterBySender(channelId, afterId, limit, sender, false);
+    }
+
+    /**
+     * Like {@link #pollAfter(UUID, Long, int, boolean)} but also filters by sender.
+     */
+    public List<Message> pollAfterBySender(UUID channelId, Long afterId, int limit, String sender,
+            boolean includeEvents) {
+        MessageQuery.Builder builder = MessageQuery.builder()
+                .channelId(channelId)
+                .afterId(afterId)
+                .limit(limit)
+                .sender(sender);
+        if (!includeEvents) {
+            builder.excludeTypes(List.of(MessageType.EVENT));
+        }
+        return messageStore.scan(builder.build());
     }
 
     public Optional<Message> findByCorrelationId(String correlationId) {

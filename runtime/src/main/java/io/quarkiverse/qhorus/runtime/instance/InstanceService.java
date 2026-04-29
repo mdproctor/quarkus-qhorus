@@ -17,20 +17,27 @@ public class InstanceService {
     @Inject
     InstanceStore instanceStore;
 
-    /** Convenience overload — no claudony session. */
+    /** Convenience overload — no claudony session, not read-only. */
     @Transactional
     public Instance register(String instanceId, String description, List<String> capabilityTags) {
-        return register(instanceId, description, capabilityTags, null);
+        return register(instanceId, description, capabilityTags, null, false);
+    }
+
+    /** Convenience overload — not read-only. */
+    @Transactional
+    public Instance register(String instanceId, String description, List<String> capabilityTags,
+            String claudonySessionId) {
+        return register(instanceId, description, capabilityTags, claudonySessionId, false);
     }
 
     /**
      * Register or update an instance. Creates if not found; updates description,
-     * status, lastSeen, and claudonySessionId if already present.
+     * status, lastSeen, claudonySessionId, and readOnly if already present.
      * Replaces capability tags on every call — no stale tags accumulate.
      */
     @Transactional
     public Instance register(String instanceId, String description, List<String> capabilityTags,
-            String claudonySessionId) {
+            String claudonySessionId, boolean readOnly) {
         Instance instance = instanceStore.findByInstanceId(instanceId).orElse(null);
 
         if (instance == null) {
@@ -42,6 +49,7 @@ public class InstanceService {
         instance.status = "online";
         instance.lastSeen = Instant.now();
         instance.claudonySessionId = claudonySessionId;
+        instance.readOnly = readOnly;
         instanceStore.put(instance);
 
         // Replace capability tags — delete existing, insert new

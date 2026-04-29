@@ -2,7 +2,6 @@ package io.quarkiverse.qhorus.runtime.mcp;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.function.Supplier;
 
@@ -29,7 +28,8 @@ public abstract class QhorusMcpToolsBase {
             String description,
             String status,
             List<String> capabilities,
-            String lastSeen) {
+            String lastSeen,
+            boolean readOnly) {
     }
 
     public record ChannelDetail(
@@ -207,17 +207,6 @@ public abstract class QhorusMcpToolsBase {
             String createdBy,
             String createdAt,
             String lastFiredAt) {
-    }
-
-    public record ObserverRegistration(
-            String observerId,
-            Set<String> channelNames) {
-    }
-
-    public record DeregisterObserverResult(
-            String observerId,
-            boolean deregistered,
-            String message) {
     }
 
     public record DeleteWatchdogResult(
