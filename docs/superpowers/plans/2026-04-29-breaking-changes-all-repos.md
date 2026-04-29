@@ -1484,7 +1484,7 @@ Refs casehubio/quarkus-qhorus#128, casehubio/quarkus-ledger#73"
 
 - [ ] **Step 1: Find casehub-engine path**
 
-Ask user for the path, or check `~/claude/casehub-engine` or `~/claude/casehub-poc`.
+Ask user for the path, or check `~/claude/casehub/engine` or `~/claude/casehub-poc`.
 
 - [ ] **Step 2: Update pom.xml**
 
@@ -1493,7 +1493,7 @@ Replace `quarkus-ledger` with `quarkus-ledger-api` in modules that only need SPI
 - [ ] **Step 3: Remove NoOpLedgerEntryRepository workarounds**
 
 ```bash
-find ~/claude/casehub-engine -name "NoOpLedgerEntryRepository.java" -path "*/test/*"
+find ~/claude/casehub/engine -name "NoOpLedgerEntryRepository.java" -path "*/test/*"
 ```
 
 If found, delete them — they were only needed because importing quarkus-ledger pulled in JPA. With `quarkus-ledger-api`, this is no longer needed.
@@ -1505,13 +1505,13 @@ Same pattern as claudony — update to api package paths.
 - [ ] **Step 5: Build and test**
 
 ```bash
-cd ~/claude/casehub-engine && JAVA_HOME=$(/usr/libexec/java_home -v 26) mvn clean test
+cd ~/claude/casehub/engine && JAVA_HOME=$(/usr/libexec/java_home -v 26) mvn clean test
 ```
 
 - [ ] **Step 6: Commit casehub-engine**
 
 ```bash
-cd ~/claude/casehub-engine
+cd ~/claude/casehub/engine
 git add -A
 git commit -m "refactor: depend on quarkus-ledger-api and quarkus-qhorus-api for SPI-only consumers
 
@@ -1542,7 +1542,7 @@ cd ~/claude/quarkus-work && JAVA_HOME=$(/usr/libexec/java_home -v 26) mvn clean 
 cd ~/claude/claudony && JAVA_HOME=$(/usr/libexec/java_home -v 26) mvn clean install
 
 # Build casehub-engine
-cd ~/claude/casehub-engine && JAVA_HOME=$(/usr/libexec/java_home -v 26) mvn clean install
+cd ~/claude/casehub/engine && JAVA_HOME=$(/usr/libexec/java_home -v 26) mvn clean install
 ```
 
 Expected: all BUILD SUCCESS.
