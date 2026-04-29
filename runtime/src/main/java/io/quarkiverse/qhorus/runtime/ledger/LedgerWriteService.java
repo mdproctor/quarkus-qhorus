@@ -129,6 +129,10 @@ public class LedgerWriteService {
         }
 
         if (CAUSAL_TYPES.contains(message.messageType.name()) && message.correlationId != null) {
+            // ifPresent is intentional: attestation requires a committed COMMAND/HANDOFF entry as its
+            // anchor (attestation.ledgerEntryId). If none exists for this correlationId (e.g. the
+            // originating COMMAND was sent before the ledger was enabled), causedByEntryId stays null
+            // and attestation is silently skipped — a gap in the trust chain, not a bug.
             repository.findLatestByCorrelationId(ch.id, message.correlationId)
                     .ifPresent(prior -> {
                         entry.causedByEntryId = prior.id;
