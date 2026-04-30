@@ -20,3 +20,4 @@
 | [2026-04-20-mdp01-db-independence-reactive.md](2026-04-20-mdp01-db-independence-reactive.md) | 2026-04-20 | Phase 13: Store + scan(Query) persistence abstraction, quarkus-ledger reconciliation, reactive migration paused; 558→717 tests |
 | [2026-04-20-mdp02-ledger-reactive-dual-stack.md](2026-04-20-mdp02-ledger-reactive-dual-stack.md) | 2026-04-20 | quarkus-ledger reactive SPI adaptation, reactive boot trap fix, issue audit, dual-stack architecture decision (epic #73) |
 | [2026-04-20-mdp03-issue-74-store-layer.md](2026-04-20-mdp03-issue-74-store-layer.md) | 2026-04-20 | Issue #74: reactive store layer ships — subagent-driven dev, parallel dispatch, LedgerAttestation fix, H2 reactive limit; 717→758 tests |
+| [2026-04-30-mdp01-platform-wide-breaking-window.md](2026-04-30-mdp01-platform-wide-breaking-window.md) | 2026-04-30 | Platform-wide breaking change push across 5 repos: MCP surface (#121), module splits (ledger-api, qhorus-api), CI timing race, naming sweep |
