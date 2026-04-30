@@ -2,10 +2,13 @@ package io.casehub.qhorus.runtime.config;
 
 import java.util.Optional;
 
+import io.quarkus.runtime.annotations.ConfigPhase;
+import io.quarkus.runtime.annotations.ConfigRoot;
 import io.smallrye.config.ConfigMapping;
 import io.smallrye.config.WithDefault;
 
 @ConfigMapping(prefix = "casehub.qhorus")
+@ConfigRoot(phase = ConfigPhase.RUN_TIME)
 public interface QhorusConfig {
 
     /** Cleanup and data retention settings. */

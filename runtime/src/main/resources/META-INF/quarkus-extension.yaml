@@ -1,5 +1,6 @@
 name: "Qhorus"
 description: "Quarkus Native agent communication mesh — peer-to-peer channels, typed messages, shared data, and presence for multi-agent AI systems"
+deployment-artifact: "io.casehub:casehub-qhorus-deployment::jar:0.2-SNAPSHOT"
 metadata:
   keywords:
     - "qhorus"
