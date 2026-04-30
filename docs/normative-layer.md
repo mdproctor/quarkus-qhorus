@@ -253,7 +253,7 @@ particular task, given its track record and how its peers have rated its decisio
 
 In most agentic systems, trust is either hardcoded ("this agent is permitted to do X") or
 absent ("we assume all agents are trustworthy"). Neither holds in production. The normative
-layer, backed by quarkus-ledger, provides a third option: trust derived from the immutable
+layer, backed by casehub-ledger, provides a third option: trust derived from the immutable
 ledger record of what agents have actually done.
 
 **Attestations** are peer review verdicts stamped onto ledger entries. When an agent reviews
@@ -557,8 +557,8 @@ This same scenario is the reference example across the full Quarkus Native AI Ag
 
 | Layer | Library added | What changes in the scenario |
 |---|---|---|
-| 1 | quarkus-qhorus + quarkus-ledger | Synthetic agents, keyboard-driven, full obligation trail |
-| 2 | + quarkus-work | Claims become real work items with inboxes; agents pick up tasks from queues |
+| 1 | casehub-qhorus + casehub-ledger | Synthetic agents, keyboard-driven, full obligation trail |
+| 2 | + casehub-work | Claims become real work items with inboxes; agents pick up tasks from queues |
 | 3 | + claudony | Agents are real LLM instances; coordinator reasons about which agent to assign |
 | 4 | + casehub | Claims are real cases from the CaseHub engine; full production stack |
 

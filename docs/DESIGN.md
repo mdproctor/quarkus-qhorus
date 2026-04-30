@@ -114,14 +114,14 @@ All services are `@ApplicationScoped`. Mutating methods are `@Transactional`.
 - `InstanceService.register()` replaces capability tags on every upsert — no stale tags accumulate.
 - `LedgerWriteService.recordEvent` runs in `REQUIRES_NEW` — a ledger write failure logs a warning and is swallowed; the message transaction is unaffected.
 - Services inject `*Store` interfaces — Panache calls are isolated in `Jpa*Store` implementations; alternative backends activate via CDI `@Alternative @Priority(1)`.
-- `AgentMessageLedgerEntryRepository` uses `EntityManager` directly (not Panache entity statics) because `LedgerEntry` is a plain `@Entity` in quarkus-ledger. `ReactiveAgentMessageLedgerEntryRepository` (`@Alternative`) implements `ReactiveLedgerEntryRepository` via `AgentMessageReactivePanacheRepo`; inactive by default — consumers activate via `quarkus.arc.selected-alternatives` alongside a reactive datasource.
+- `AgentMessageLedgerEntryRepository` uses `EntityManager` directly (not Panache entity statics) because `LedgerEntry` is a plain `@Entity` in casehub-ledger. `ReactiveAgentMessageLedgerEntryRepository` (`@Alternative`) implements `ReactiveLedgerEntryRepository` via `AgentMessageReactivePanacheRepo`; inactive by default — consumers activate via `quarkus.arc.selected-alternatives` alongside a reactive datasource.
 
 ---
 
 ## Persistence Abstraction
 
 Five domain store interfaces under `runtime/store/`, JPA implementations under
-`runtime/store/jpa/`, in-memory implementations in `quarkus-qhorus-testing`.
+`runtime/store/jpa/`, in-memory implementations in `casehub-qhorus-testing`.
 
 ### Blocking stores (default)
 
@@ -135,7 +135,7 @@ Five domain store interfaces under `runtime/store/`, JPA implementations under
 
 ### Reactive stores (`quarkus.qhorus.reactive.enabled=true`)
 
-Mirror interfaces under `runtime/store/` with `Uni<T>` returns. `@Alternative` JPA implementations in `runtime/store/jpa/`. `@Alternative @Priority(1)` in-memory implementations in `quarkus-qhorus-testing`.
+Mirror interfaces under `runtime/store/` with `Uni<T>` returns. `@Alternative` JPA implementations in `runtime/store/jpa/`. `@Alternative @Priority(1)` in-memory implementations in `casehub-qhorus-testing`.
 
 | Interface | JPA impl | InMemory impl |
 |---|---|---|
@@ -147,7 +147,7 @@ Mirror interfaces under `runtime/store/` with `Uni<T>` returns. `@Alternative` J
 
 `InMemoryReactive*Store` delegates to the corresponding `InMemory*Store` via `Uni.createFrom().item(...)` — all state and logic stay in the blocking in-memory store; the reactive wrapper is pure delegation.
 
-Consumers add `quarkus-qhorus-testing` at test scope to activate in-memory
+Consumers add `casehub-qhorus-testing` at test scope to activate in-memory
 stores automatically — no database required for unit tests. See
 [ADR-0002](../adr/0002-persistence-abstraction-store-pattern.md) and
 [ADR-0003](../adr/0003-reactive-dual-stack.md).
@@ -252,7 +252,7 @@ All tools exposed via `QhorusMcpTools` (`@ApplicationScoped`, active by default)
 | **9 — A2A compat** | ✅ Done | `POST /a2a/message:send`, `GET /a2a/tasks/{id}`; guarded by `quarkus.qhorus.a2a.enabled`; 29 tests |
 | **10 — Human-in-the-loop controls** | ✅ Done | pause/resume, approval gate, cancel_wait, force_release, revoke_artefact, delete_message, clear_channel, deregister_instance, channel_digest, watchdog alerting (optional); 103 tests |
 | **11 — Access control and governance** | ✅ Done | Write permissions (V5, `allowed_writers`, 23 tests); admin role (V6, `admin_instances`, 23 tests); rate limiting (V7, `RateLimiter`, 21 tests); observer mode (`ObserverRegistry`, `register_observer`, `read_observer_events`, 15 tests) — 82 tests total |
-| **12 — Structured observability** | ✅ Done | `AgentMessageLedgerEntry` (quarkus-ledger subclass, V1002); `LedgerWriteService` captures structured EVENTs; `list_events` MCP tool (channel/agent/time filters, cursor pagination); `get_channel_timeline` MCP tool; 36 tests (557 total) |
+| **12 — Structured observability** | ✅ Done | `AgentMessageLedgerEntry` (casehub-ledger subclass, V1002); `LedgerWriteService` captures structured EVENTs; `list_events` MCP tool (channel/agent/time filters, cursor pagination); `get_channel_timeline` MCP tool; 36 tests (557 total) |
 | **13 — Persistence abstraction** | ✅ Done | Store + scan(Query) pattern; JPA impls; testing/ module; 88 new tests (646 total) |
 | **14 — Reactive dual-stack** | ✅ Done | Reactive*Store (5 domains) + ReactiveJpa*Store + InMemoryReactive*Store (#74, #75); QhorusMcpToolsBase extraction (#76); Reactive*Service + ReactiveLedgerWriteService (#77); ReactiveQhorusMcpTools — 39 tools returning Uni<T> (#78); build-time activation + ReactiveAgentCardResource + ReactiveA2AResource (#79); contract test bases + @Disabled reactive runners (#80) |
 | **15 — Documentation** | ✅ Done | DESIGN.md, ADR-0003, CLAUDE.md (#81) |
