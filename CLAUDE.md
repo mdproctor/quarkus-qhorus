@@ -1,4 +1,4 @@
-# Quarkus Qhorus — Claude Code Project Guide
+# CaseHub Qhorus — Claude Code Project Guide
 
 ## Platform Context
 
@@ -35,7 +35,7 @@ type: java
 
 ## What This Project Is
 
-Qhorus is a Quarkus extension providing an agent communication mesh — the peer-to-peer coordination layer for multi-agent AI systems. It is the Quarkus port of cross-claude-mcp (`~/claude/cross-claude-mcp`), redesigned based on research into A2A, AutoGen, LangGraph, Swarm, Letta, and CrewAI.
+Qhorus is a CaseHub library — a Quarkus-based agent communication mesh and the peer-to-peer coordination layer for multi-agent AI systems. It is a permanent component of the casehubio platform (not a Quarkiverse submission), built on Quarkus and informed by research into A2A, AutoGen, LangGraph, Swarm, Letta, and CrewAI.
 
 More precisely: Qhorus is a **governance methodology** for multi-agent AI — not middleware. It gives every agent interaction the formal status of an accountable act, grounded in speech act theory, deontic logic, defeasible reasoning, and social commitment semantics. The LLM reasons; the infrastructure enforces, records, and derives. See `docs/normative-layer.md` for the full framing.
 
@@ -143,7 +143,7 @@ casehub-qhorus/
 │   ├── examples/normative-layout/       — Deterministic 3-channel NormativeChannelLayout tests (CI, no LLM); canonical Layer 1 reference
 │   └── examples/agent-communication/    — Real LLM agent examples (Jlama); 3 enterprise scenarios + accuracy baseline; activate with -Pwith-llm-examples
 ├── docs/specs/                          — Design specs
-└── .github/                             — Quarkiverse CI workflows
+└── .github/                             — CI workflows
 ```
 
 ---
@@ -192,7 +192,7 @@ JAVA_HOME=/Library/Java/JavaVirtualMachines/graalvm-25.jdk/Contents/Home \
 - `examples/type-system/` runs in CI (no model, no Jlama). `examples/agent-communication/` is behind `-Pwith-llm-examples` — requires local Jlama fixes installed from `~/claude/quarkus-langchain4j` and model in `~/.jlama/` (~700MB, first run only). See `examples/agent-communication/README.md`.
 - `delete_channel` with `force=true` calls `messageStore.deleteAll(channelId)` before `channelStore.delete(channelId)` — required because `fk_message_channel` has no CASCADE. When testing `delete_channel` in integration tests, messages must be committed (in a separate `QuarkusTransaction.requiringNew()` block) before calling delete, because delete runs in its own transaction.
 
-**Quarkiverse format check:** CI runs `mvn -Dno-format` to skip the enforced Quarkiverse code formatting. Run `mvn` locally to apply formatting (via Quarkiverse parent's formatter plugin).
+**Format check:** CI runs `mvn -Dno-format` to skip the enforced code formatting. Run `mvn` locally to apply formatting (via the formatter plugin in the Maven parent).
 
 ---
 
