@@ -12,4 +12,4 @@ metadata:
   categories:
     - "integration"
   status: "experimental"
-  guide: "https://github.com/casehubio/quarkus-qhorus"
+  guide: "https://github.com/casehubio/qhorus"

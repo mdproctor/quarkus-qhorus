@@ -4,13 +4,13 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
-    <groupId>io.quarkiverse.qhorus</groupId>
-    <artifactId>quarkus-qhorus-examples</artifactId>
+    <groupId>io.casehub</groupId>
+    <artifactId>casehub-qhorus-examples</artifactId>
     <version>0.2-SNAPSHOT</version>
   </parent>
 
-  <artifactId>quarkus-qhorus-example-type-system</artifactId>
-  <name>Quarkus Qhorus :: Examples :: Type System</name>
+  <artifactId>casehub-qhorus-example-type-system</artifactId>
+  <name>CaseHub Qhorus :: Examples :: Type System</name>
   <description>
     Fast regression tests for the 9-type speech-act message taxonomy.
     No LLM required — runs in CI using InMemory stores and H2.
@@ -19,13 +19,13 @@
 
   <dependencies>
     <dependency>
-      <groupId>io.quarkiverse.qhorus</groupId>
-      <artifactId>quarkus-qhorus</artifactId>
+      <groupId>io.casehub</groupId>
+      <artifactId>casehub-qhorus</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>
-      <groupId>io.quarkiverse.qhorus</groupId>
-      <artifactId>quarkus-qhorus-testing</artifactId>
+      <groupId>io.casehub</groupId>
+      <artifactId>casehub-qhorus-testing</artifactId>
       <version>${project.version}</version>
       <scope>test</scope>
     </dependency>

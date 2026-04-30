@@ -5,19 +5,19 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>io.quarkiverse.qhorus</groupId>
-    <artifactId>quarkus-qhorus-parent</artifactId>
+    <groupId>io.casehub</groupId>
+    <artifactId>casehub-qhorus-parent</artifactId>
     <version>0.2-SNAPSHOT</version>
   </parent>
 
-  <artifactId>quarkus-qhorus-testing</artifactId>
+  <artifactId>casehub-qhorus-testing</artifactId>
   <name>Quarkus Qhorus - Testing</name>
   <description>In-memory store implementations for fast unit testing without a database</description>
 
   <dependencies>
     <dependency>
-      <groupId>io.quarkiverse.qhorus</groupId>
-      <artifactId>quarkus-qhorus</artifactId>
+      <groupId>io.casehub</groupId>
+      <artifactId>casehub-qhorus</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>

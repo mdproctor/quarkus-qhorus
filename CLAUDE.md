@@ -13,12 +13,12 @@ https://raw.githubusercontent.com/casehubio/casehub-parent/main/docs/PLATFORM.md
 
 **This repo's deep-dive:**
 ```
-https://raw.githubusercontent.com/casehubio/casehub-parent/main/docs/repos/quarkus-qhorus.md
+https://raw.githubusercontent.com/casehubio/casehub-parent/main/docs/repos/casehub-qhorus.md
 ```
 
 **Other repo deep-dives** (fetch the relevant ones when your implementation touches their domain):
-- quarkus-ledger: `https://raw.githubusercontent.com/casehubio/casehub-parent/main/docs/repos/quarkus-ledger.md`
-- quarkus-work: `https://raw.githubusercontent.com/casehubio/casehub-parent/main/docs/repos/quarkus-work.md`
+- casehub-ledger: `https://raw.githubusercontent.com/casehubio/casehub-parent/main/docs/repos/casehub-ledger.md`
+- casehub-work: `https://raw.githubusercontent.com/casehubio/casehub-parent/main/docs/repos/casehub-work.md`
 - casehub-engine: `https://raw.githubusercontent.com/casehubio/casehub-parent/main/docs/repos/casehub-engine.md`
 - claudony: `https://raw.githubusercontent.com/casehubio/casehub-parent/main/docs/repos/claudony.md`
 - casehub-connectors: `https://raw.githubusercontent.com/casehubio/casehub-parent/main/docs/repos/casehub-connectors.md`
@@ -39,34 +39,34 @@ Qhorus is a Quarkus extension providing an agent communication mesh — the peer
 
 More precisely: Qhorus is a **governance methodology** for multi-agent AI — not middleware. It gives every agent interaction the formal status of an accountable act, grounded in speech act theory, deontic logic, defeasible reasoning, and social commitment semantics. The LLM reasons; the infrastructure enforces, records, and derives. See `docs/normative-layer.md` for the full framing.
 
-Any Quarkus app adds `io.quarkiverse.qhorus:quarkus-qhorus` as a dependency and its agents immediately get:
+Any Quarkus app adds `io.casehub:casehub-qhorus` as a dependency and its agents immediately get:
 - **Typed channels** with declared update semantics (APPEND, COLLECT, BARRIER, EPHEMERAL, LAST_WRITE)
 - **Typed messages** (query · command · response · status · decline · handoff · done · failure · event) — 9-type speech-act taxonomy; see ADR-0005
 - **Shared data store** with artefact lifecycle management (claim/release, UUID refs, chunked streaming)
 - **Instance registry** with capability tags and three addressing modes (by id · by capability · by role)
 - **`wait_for_reply`** long-poll with correlation IDs and SSE keepalives
 - **Agent Cards** at `/.well-known/agent-card.json` for A2A ecosystem discovery
-- **Normative audit ledger** — every message of all 9 types creates a `MessageLedgerEntry` (via `quarkus-ledger`) with SHA-256 tamper evidence. The ledger is the complete, immutable channel history. Queryable via `list_ledger_entries` (type_filter, sender, correlation_id, sort, after_id, limit — entry_id in output), `get_obligation_chain` (participants + elapsed + resolution), `get_causal_chain` (walk causedByEntryId to root), `list_stalled_obligations`, `get_obligation_stats` (fulfillment rate), `get_telemetry_summary` (per-tool EVENT aggregation), and `get_channel_timeline`
+- **Normative audit ledger** — every message of all 9 types creates a `MessageLedgerEntry` (via `casehub-ledger`) with SHA-256 tamper evidence. The ledger is the complete, immutable channel history. Queryable via `list_ledger_entries` (type_filter, sender, correlation_id, sort, after_id, limit — entry_id in output), `get_obligation_chain` (participants + elapsed + resolution), `get_causal_chain` (walk causedByEntryId to root), `list_stalled_obligations`, `get_obligation_stats` (fulfillment rate), `get_telemetry_summary` (per-tool EVENT aggregation), and `get_channel_timeline`
 
-Qhorus is designed to be embedded in Claudony (`~/claude/claudony`) as part of the broader Quarkus Native AI Agent Ecosystem, and eventually submitted to Quarkiverse.
+Qhorus is designed to be embedded in Claudony (`~/claude/casehub/claudony`) as part of the broader Quarkus Native AI Agent Ecosystem.
 
 ---
 
-## Quarkiverse Naming
+## CaseHub Naming
 
-This project follows Quarkiverse naming conventions throughout:
+This project uses casehub naming conventions:
 
 | Element | Value |
 |---|---|
-| GitHub repo | `casehubio/quarkus-qhorus` (→ `quarkiverse/quarkus-qhorus` when submitted) |
-| groupId | `io.quarkiverse.qhorus` |
-| Parent artifactId | `quarkus-qhorus-parent` |
-| Runtime artifactId | `quarkus-qhorus` |
-| Deployment artifactId | `quarkus-qhorus-deployment` |
-| Root Java package | `io.quarkiverse.qhorus` |
-| Runtime subpackage | `io.quarkiverse.qhorus.runtime` |
-| Deployment subpackage | `io.quarkiverse.qhorus.deployment` |
-| Config prefix | `quarkus.qhorus` |
+| GitHub repo | `casehubio/qhorus` |
+| groupId | `io.casehub` |
+| Parent artifactId | `casehub-qhorus-parent` |
+| Runtime artifactId | `casehub-qhorus` |
+| Deployment artifactId | `casehub-qhorus-deployment` |
+| Root Java package | `io.casehub.qhorus` |
+| Runtime subpackage | `io.casehub.qhorus.runtime` |
+| Deployment subpackage | `io.casehub.qhorus.deployment` |
+| Config prefix | `casehub.qhorus` |
 | Feature name | `qhorus` |
 
 ---
@@ -74,7 +74,7 @@ This project follows Quarkiverse naming conventions throughout:
 ## Ecosystem Context
 
 ```
-casehub (orchestration engine)   quarkus-qhorus (communication mesh)
+casehub (orchestration engine)   casehub-qhorus (communication mesh)
            ↑                              ↑
            └──────── claudony (integration layer) ──────────┘
 ```
@@ -86,10 +86,10 @@ Qhorus has no dependency on CaseHub or Claudony — it is the independent commun
 ## Project Structure
 
 ```
-quarkus-qhorus/
+casehub-qhorus/
 ├── runtime/                             — Extension runtime module
-│   └── src/main/java/io/quarkiverse/qhorus/runtime/
-│       ├── config/QhorusConfig.java     — @ConfigMapping(prefix = "quarkus.qhorus")
+│   └── src/main/java/io/casehub/qhorus/runtime/
+│       ├── config/QhorusConfig.java     — @ConfigMapping(prefix = "casehub.qhorus")
 │       ├── channel/
 │       │   ├── Channel.java             — PanacheEntity; `allowedTypes` TEXT nullable — null = open; comma-separated MessageType names enforced by MessageTypePolicy SPI
 │       │   ├── ChannelSemantic.java     — enum: APPEND|COLLECT|BARRIER|EPHEMERAL|LAST_WRITE
@@ -118,7 +118,7 @@ quarkus-qhorus/
 │       │   ├── InstanceActorIdProvider.java         — @FunctionalInterface SPI: maps instanceId → ledger actorId; DefaultInstanceActorIdProvider is no-op identity; Refs #124
 │       │   ├── DefaultInstanceActorIdProvider.java  — @DefaultBean identity implementation; replaced by Claudony's session→persona mapping
 │       │   ├── CommitmentAttestationPolicy.java     — @FunctionalInterface SPI: determines LedgerAttestation for DONE/FAILURE/DECLINE; AttestationOutcome record; Refs #123
-│       │   ├── StoredCommitmentAttestationPolicy.java — @DefaultBean: DONE→SOUND/0.7, FAILURE→FLAGGED/0.6, DECLINE→FLAGGED/0.4; config via quarkus.qhorus.attestation.*
+│       │   ├── StoredCommitmentAttestationPolicy.java — @DefaultBean: DONE→SOUND/0.7, FAILURE→FLAGGED/0.6, DECLINE→FLAGGED/0.4; config via casehub.qhorus.attestation.*
 │       │   └── ReactiveLedgerWriteService.java      — @Alternative reactive mirror of LedgerWriteService
 │       ├── mcp/
 │       │   ├── QhorusMcpToolsBase.java  — abstract base: records, mappers (toLedgerEntryMap, toMessageSummary, etc.), validators; ledger query response records (ObligationChainSummary, CausalChainEntry, StalledObligation, ObligationStats, TelemetrySummary, ToolTelemetry)
@@ -134,8 +134,8 @@ quarkus-qhorus/
 │           ├── ReactiveAgentCardResource.java — reactive Uni<Response> agent card (@IfBuildProperty)
 │           └── ReactiveA2AResource.java       — reactive A2A endpoints (@IfBuildProperty)
 ├── deployment/                          — Extension deployment (build-time) module
-│   └── src/main/java/io/quarkiverse/qhorus/deployment/
-│       ├── QhorusBuildConfig.java       — @ConfigRoot(BUILD_TIME): quarkus.qhorus.reactive.enabled
+│   └── src/main/java/io/casehub/qhorus/deployment/
+│       ├── QhorusBuildConfig.java       — @ConfigRoot(BUILD_TIME): casehub.qhorus.reactive.enabled
 │       └── QhorusProcessor.java         — @BuildStep: FeatureBuildItem + reactive bean activation
 ├── testing/                             — InMemory*Store + InMemoryReactive*Store (@Alternative @Priority(1)) for consumer unit tests
 ├── examples/
@@ -171,20 +171,20 @@ JAVA_HOME=/Library/Java/JavaVirtualMachines/graalvm-25.jdk/Contents/Home \
 - `@TestTransaction` + RestAssured HTTP calls do NOT share a transaction — injected writes are uncommitted and invisible to the HTTP handler. Avoid `@TestTransaction` on tests that mix injected calls with RestAssured. Use unique names per test for isolation instead.
 - `@TestTransaction` wraps the test METHOD only, not `@BeforeEach`. Any channel/entity created in `@BeforeEach` via `@Transactional` tool methods commits immediately and is visible. However, `LedgerWriteService.record()` uses `REQUIRES_NEW` — ledger entries from prior tests' `@BeforeEach` runs PERSIST after rollback. Always set up channels and send scenario messages inside the `@Test` method body, not in `@BeforeEach`, to avoid stale ledger entries interfering with queries in subsequent tests.
 - For tests requiring concurrent execution (e.g. cancel-while-blocking), use `@Inject ManagedExecutor executor` rather than raw `ExecutorService` — `ManagedExecutor` propagates Quarkus CDI context so `@Transactional` works on background threads.
-- Optional modules (`a2a`, `watchdog`) require a `@TestProfile` that sets `quarkus.qhorus.<module>.enabled=true`. Any `@TestProfile` that causes Quarkus to restart must also include the full `quarkus.datasource.qhorus.*` block (db-kind, jdbc.url, username, password) plus `quarkus.datasource.qhorus.reactive=false` and `quarkus.hibernate-orm.qhorus.database.generation=drop-and-create` in `getConfigOverrides()` — Quarkus restarts do not inherit test `application.properties` from prior context.
+- Optional modules (`a2a`, `watchdog`) require a `@TestProfile` that sets `casehub.qhorus.<module>.enabled=true`. Any `@TestProfile` that causes Quarkus to restart must also include the full `quarkus.datasource.qhorus.*` block (db-kind, jdbc.url, username, password) plus `quarkus.datasource.qhorus.reactive=false` and `quarkus.hibernate-orm.qhorus.database.generation=drop-and-create` in `getConfigOverrides()` — Quarkus restarts do not inherit test `application.properties` from prior context.
 - `RateLimiter` and `ObserverRegistry` are `@ApplicationScoped` in-memory beans — their state does NOT roll back with `@TestTransaction`. Use unique channel names and observer IDs per test to avoid cross-test interference.
 - `check_messages` excludes `EVENT` messages by design — never assert EVENT counts via `check_messages`. Use `read_observer_events` (with a registered observer ID) to assert EVENT delivery in tests.
 - `MessageTypePolicy` is injected into both `QhorusMcpTools.sendMessage()` (client-side check) and `MessageService.send()` (server-side safety net). Tests calling `messageService.send()` directly on a channel with `allowedTypes` set will hit the server-side check and receive `MessageTypeViolationException`. The default `StoredMessageTypePolicy` reads `channel.allowedTypes` at call time — no caching.
 - `LedgerWriteService.record(Channel, Message)` is called for **all 9 message types** — not just EVENT. Every `sendMessage` call produces a `MessageLedgerEntry`. EVENT entries extract telemetry from JSON content (`tool_name`, `duration_ms`, `token_count` — all nullable); malformed or missing fields still produce an entry. Tests asserting ledger entries do NOT need structured JSON payloads; any content works.
 - `LedgerWriteService` does NOT query `CommitmentStore` — attestation verdict is derived from `MessageType` directly via `CommitmentAttestationPolicy`. The CommitmentStore query inside `REQUIRES_NEW` would see stale OPEN state (outer tx's update not yet committed). Integration tests for attestation must use `@TestTransaction` + `QhorusMcpTools.sendMessage()` (not `messageService.send()` directly, which bypasses the ledger write call in `QhorusMcpTools`).
-- `*Store` interfaces are the persistence seam — six interfaces: `ChannelStore`, `MessageStore`, `InstanceStore`, `DataStore`, `WatchdogStore`, `CommitmentStore` (full obligation lifecycle: OPEN→FULFILLED/DECLINED/FAILED/DELEGATED/EXPIRED). `PendingReplyStore` was deleted — replaced by `CommitmentStore`. Services inject stores, not Panache entity statics. Integration tests (`@QuarkusTest`) inject `*Store` directly; unit tests use `InMemory*Store` from `quarkus-qhorus-testing`.
+- `*Store` interfaces are the persistence seam — six interfaces: `ChannelStore`, `MessageStore`, `InstanceStore`, `DataStore`, `WatchdogStore`, `CommitmentStore` (full obligation lifecycle: OPEN→FULFILLED/DECLINED/FAILED/DELEGATED/EXPIRED). `PendingReplyStore` was deleted — replaced by `CommitmentStore`. Services inject stores, not Panache entity statics. Integration tests (`@QuarkusTest`) inject `*Store` directly; unit tests use `InMemory*Store` from `casehub-qhorus-testing`.
 - `CommitmentService` unit tests live in `testing/src/test/...` (not `runtime/src/test/...`) to avoid a module cycle — the testing module provides `InMemoryCommitmentStore` used for CDI-free wiring. `service.store = store` sets the dependency directly.
 - `CommitmentStoreContractTest` (abstract, in `testing/src/test/`) has two runners: `InMemoryCommitmentStoreTest` (blocking) and `InMemoryReactiveCommitmentStoreTest` (reactive, wraps with `.await().indefinitely()`).
 - `quarkus.http.test-port=0` is set in test `application.properties` to use a random port — avoids conflicts when other Quarkus apps (e.g. Claudony) are running on 8081. Requires `mvn clean` to take effect after the property is added.
-- Tests run against a **named 'qhorus' datasource** (`quarkus.datasource.qhorus.*`) — the Qhorus named PU. A default datasource is also configured in test properties to satisfy quarkus-ledger library beans that inject `@Default EntityManager` (library code; cannot be changed). Both PUs require schema generation: `quarkus.hibernate-orm.database.generation=drop-and-create` (default PU) and `quarkus.hibernate-orm.qhorus.database.generation=drop-and-create` (qhorus PU). `quarkus.datasource.qhorus.reactive=false` suppresses `FastBootHibernateReactivePersistenceProvider` for the named PU.
-- `Reactive*Store` / `InMemoryReactive*Store` follow the same seam as blocking stores. Unit tests use `InMemoryReactive*Store` from `quarkus-qhorus-testing` via direct instantiation (no CDI) and `.await().indefinitely()` to unwrap. `ReactiveJpa*Store` integration tests use `@QuarkusTest @TestProfile @RunOnVertxContext UniAsserter` with `Panache.withTransaction()` wrapping mutations.
+- Tests run against a **named 'qhorus' datasource** (`quarkus.datasource.qhorus.*`) — the Qhorus named PU. A default datasource is also configured in test properties to satisfy casehub-ledger library beans that inject `@Default EntityManager` (library code; cannot be changed). Both PUs require schema generation: `quarkus.hibernate-orm.database.generation=drop-and-create` (default PU) and `quarkus.hibernate-orm.qhorus.database.generation=drop-and-create` (qhorus PU). `quarkus.datasource.qhorus.reactive=false` suppresses `FastBootHibernateReactivePersistenceProvider` for the named PU.
+- `Reactive*Store` / `InMemoryReactive*Store` follow the same seam as blocking stores. Unit tests use `InMemoryReactive*Store` from `casehub-qhorus-testing` via direct instantiation (no CDI) and `.await().indefinitely()` to unwrap. `ReactiveJpa*Store` integration tests use `@QuarkusTest @TestProfile @RunOnVertxContext UniAsserter` with `Panache.withTransaction()` wrapping mutations.
 - Reactive JPA integration tests cannot use H2 — H2 has no native async driver and `vertx-jdbc-client` alone does not register a Quarkus reactive pool factory. Only `quarkus-reactive-pg-client` (PostgreSQL + Docker) enables reactive `@QuarkusTest`. Write reactive JPA tests as `@Disabled` until Docker is available.
-- `@IfBuildProperty` and `@UnlessBuildProperty` are BUILD-TIME annotations — setting `quarkus.qhorus.reactive.enabled=true` in a `QuarkusTestProfile.getConfigOverrides()` does NOT activate or deactivate those beans. Only the build-time value matters. Tests that need to exercise `ReactiveQhorusMcpTools` must be compiled with the property set, which is not currently supported in the CI H2 test environment.
+- `@IfBuildProperty` and `@UnlessBuildProperty` are BUILD-TIME annotations — setting `casehub.qhorus.reactive.enabled=true` in a `QuarkusTestProfile.getConfigOverrides()` does NOT activate or deactivate those beans. Only the build-time value matters. Tests that need to exercise `ReactiveQhorusMcpTools` must be compiled with the property set, which is not currently supported in the CI H2 test environment.
 - `ReactiveTestProfile` (in `runtime/src/test/.../service/`) activates reactive `@Alternative` service beans via `quarkus.arc.selected-alternatives`. Use it only on `@Disabled` reactive service runners — calling `Panache.withTransaction()` on H2 without a reactive driver will fail at runtime, even with the profile active.
 - Reactive service tests (`Reactive*ServiceTest`) are all `@Disabled` — reactive services call `Panache.withTransaction()` which needs a native reactive datasource driver. Enable by removing `@Disabled` and adding PostgreSQL Dev Services to `ReactiveTestProfile` when Docker is available.
 - Store contract tests use abstract base classes (`*StoreContractTest` in `testing/src/test/.../contract/`) with two concrete runners each: blocking (`InMemory*StoreTest`) and reactive (`InMemoryReactive*StoreTest`). The reactive runner wraps every factory method with `.await().indefinitely()`. Assertion code is identical across both stacks (inherited from base).
@@ -219,7 +219,7 @@ JAVA_HOME=/Library/Java/JavaVirtualMachines/graalvm-25.jdk/Contents/Home
 ## Work Tracking
 
 **Issue tracking:** enabled
-**GitHub repo:** casehubio/quarkus-qhorus
+**GitHub repo:** casehubio/qhorus
 
 **Automatic behaviours (Claude follows these at all times in this project):**
 - **Before implementation begins** — check if an active issue exists. If not, run issue-workflow Phase 1 before writing any code.
@@ -251,5 +251,5 @@ All casehubio projects align on these conventions:
 ```
 CI must use `server-id: github` + `GITHUB_TOKEN` in `actions/setup-java`.
 
-**Cross-project SNAPSHOT versions:** `quarkus-ledger` and `quarkus-work` modules are `0.2-SNAPSHOT` resolved from GitHub Packages. Declare in `pom.xml` properties and `<dependencyManagement>` — no hardcoded versions in submodule poms.
+**Cross-project SNAPSHOT versions:** `casehub-ledger` and `casehub-work` modules are `0.2-SNAPSHOT` resolved from GitHub Packages. Declare in `pom.xml` properties and `<dependencyManagement>` — no hardcoded versions in submodule poms.
 

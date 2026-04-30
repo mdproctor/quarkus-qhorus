@@ -4,20 +4,14 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <parent>
-    <groupId>io.quarkiverse</groupId>
-    <artifactId>quarkiverse-parent</artifactId>
-    <version>21</version>
-  </parent>
-
-  <groupId>io.quarkiverse.qhorus</groupId>
-  <artifactId>quarkus-qhorus-parent</artifactId>
+  <groupId>io.casehub</groupId>
+  <artifactId>casehub-qhorus-parent</artifactId>
   <version>0.2-SNAPSHOT</version>
   <packaging>pom</packaging>
 
-  <name>Quarkus Qhorus - Parent</name>
+  <name>CaseHub Qhorus - Parent</name>
   <description>Quarkus Native agent communication mesh — peer-to-peer channels, typed messages, shared data, presence</description>
-  <url>https://github.com/mdproctor/quarkus-qhorus</url>
+  <url>https://github.com/casehubio/qhorus</url>
 
   <modules>
     <module>api</module>
@@ -28,9 +22,9 @@
   </modules>
 
   <scm>
-    <connection>scm:git:git@github.com:mdproctor/quarkus-qhorus.git</connection>
-    <developerConnection>scm:git:git@github.com:mdproctor/quarkus-qhorus.git</developerConnection>
-    <url>https://github.com/mdproctor/quarkus-qhorus</url>
+    <connection>scm:git:git@github.com:casehubio/qhorus.git</connection>
+    <developerConnection>scm:git:git@github.com:casehubio/qhorus.git</developerConnection>
+    <url>https://github.com/casehubio/qhorus</url>
     <tag>HEAD</tag>
   </scm>
 
@@ -38,12 +32,12 @@
     <repository>
       <id>github</id>
       <name>casehubio GitHub Packages</name>
-      <url>https://maven.pkg.github.com/casehubio/quarkus-qhorus</url>
+      <url>https://maven.pkg.github.com/casehubio/qhorus</url>
     </repository>
     <snapshotRepository>
       <id>github</id>
       <name>casehubio GitHub Packages</name>
-      <url>https://maven.pkg.github.com/casehubio/quarkus-qhorus</url>
+      <url>https://maven.pkg.github.com/casehubio/qhorus</url>
     </snapshotRepository>
   </distributionManagement>
 

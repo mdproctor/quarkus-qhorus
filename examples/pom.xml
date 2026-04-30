@@ -5,14 +5,14 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>io.quarkiverse.qhorus</groupId>
-    <artifactId>quarkus-qhorus-parent</artifactId>
+    <groupId>io.casehub</groupId>
+    <artifactId>casehub-qhorus-parent</artifactId>
     <version>0.2-SNAPSHOT</version>
   </parent>
 
-  <artifactId>quarkus-qhorus-examples</artifactId>
+  <artifactId>casehub-qhorus-examples</artifactId>
   <packaging>pom</packaging>
-  <name>Quarkus Qhorus - Examples</name>
+  <name>CaseHub Qhorus - Examples</name>
   <description>Usage examples showing the Qhorus message taxonomy, store injection, and in-memory testing.</description>
 
   <!--

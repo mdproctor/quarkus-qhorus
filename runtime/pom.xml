@@ -5,12 +5,12 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>io.quarkiverse.qhorus</groupId>
-    <artifactId>quarkus-qhorus-parent</artifactId>
+    <groupId>io.casehub</groupId>
+    <artifactId>casehub-qhorus-parent</artifactId>
     <version>0.2-SNAPSHOT</version>
   </parent>
 
-  <artifactId>quarkus-qhorus</artifactId>
+  <artifactId>casehub-qhorus</artifactId>
   <name>Quarkus Qhorus - Runtime</name>
 
   <dependencies>
@@ -76,8 +76,8 @@
 
     <!-- Qhorus API — enums, SPI interfaces, exception types -->
     <dependency>
-      <groupId>io.quarkiverse.qhorus</groupId>
-      <artifactId>quarkus-qhorus-api</artifactId>
+      <groupId>io.casehub</groupId>
+      <artifactId>casehub-qhorus-api</artifactId>
       <version>${project.version}</version>
     </dependency>
 

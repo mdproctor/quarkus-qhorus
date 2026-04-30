@@ -4,23 +4,23 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
-    <groupId>io.quarkiverse.qhorus</groupId>
-    <artifactId>quarkus-qhorus-examples</artifactId>
+    <groupId>io.casehub</groupId>
+    <artifactId>casehub-qhorus-examples</artifactId>
     <version>0.2-SNAPSHOT</version>
   </parent>
 
-  <artifactId>quarkus-qhorus-example-agent-communication</artifactId>
-  <name>Quarkus Qhorus :: Examples :: Agent Communication</name>
+  <artifactId>casehub-qhorus-example-agent-communication</artifactId>
+  <name>CaseHub Qhorus :: Examples :: Agent Communication</name>
 
   <dependencies>
     <dependency>
-      <groupId>io.quarkiverse.qhorus</groupId>
-      <artifactId>quarkus-qhorus</artifactId>
+      <groupId>io.casehub</groupId>
+      <artifactId>casehub-qhorus</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>
-      <groupId>io.quarkiverse.qhorus</groupId>
-      <artifactId>quarkus-qhorus-testing</artifactId>
+      <groupId>io.casehub</groupId>
+      <artifactId>casehub-qhorus-testing</artifactId>
       <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
