@@ -1,9 +1,9 @@
-# Quarkus Qhorus — Design Document
+# CaseHub Qhorus — Design Document
 
 ## Overview
 
-Qhorus is a Quarkus extension providing a peer-to-peer agent communication
-mesh for multi-agent AI systems. Any Quarkus app adds `quarkus-qhorus` as a
+Qhorus is a CaseHub library providing a peer-to-peer agent communication
+mesh for multi-agent AI systems. Any Quarkus app adds `casehub-qhorus` as a
 dependency and its agents get typed channels, typed messages, a shared data
 store with artefact lifecycle management, an instance registry with capability
 tags, and `wait_for_reply` long-polling with correlation IDs.
@@ -18,13 +18,14 @@ Full multi-agent framework comparison (Qhorus, A2A, ACP, AutoGen, LangGraph, Cre
 
 ## Component Structure
 
-Maven multi-module layout following Quarkiverse conventions:
+Maven multi-module layout:
 
 | Module | Artifact | Purpose |
 |---|---|---|
-| Parent | `quarkus-qhorus-parent` | BOM, version management |
-| Runtime | `quarkus-qhorus` | Extension runtime — entities, services, MCP tools, REST |
-| Deployment | `quarkus-qhorus-deployment` | Build-time processor — feature registration, native config |
+| Parent | `casehub-qhorus-parent` | BOM, version management |
+| API | `casehub-qhorus-api` | Enums, SPIs, and extension interfaces — no JPA |
+| Runtime | `casehub-qhorus` | Extension runtime — entities, services, MCP tools, REST |
+| Deployment | `casehub-qhorus-deployment` | Build-time processor — feature registration, native config |
 
 ---
 
@@ -33,7 +34,7 @@ Maven multi-module layout following Quarkiverse conventions:
 | Concern | Choice | Notes |
 |---|---|---|
 | Runtime | Java 21 (on Java 26 JVM) | `maven.compiler.release=21` |
-| Framework | Quarkus 3.32.2 | Inherits `quarkiverse-parent:21` |
+| Framework | Quarkus 3.32.2 | Quarkus platform; casehub-parent for BOM |
 | Persistence | Hibernate ORM + Panache (active record) | Panache `PanacheEntityBase`, UUID PKs |
 | Reactive persistence | Hibernate Reactive Panache (optional) | `quarkus-hibernate-reactive-panache`; `@Alternative` reactive SPI beans; activate with a reactive datasource |
 | Schema migrations | Flyway | `V1__initial_schema.sql`; consuming app owns datasource config |

@@ -23,14 +23,14 @@ persistence:
 
 `AgentMessageLedgerEntry extends LedgerEntry` via JPA JOINED inheritance. JPA
 requires all entities in an inheritance hierarchy to share a single persistence
-unit. `LedgerEntry` (from `quarkus-ledger`, package
-`io.quarkiverse.ledger.runtime`) is included in the "qhorus" packages config:
+unit. `LedgerEntry` (from `casehub-ledger`, package
+`io.casehub.ledger.runtime`) is included in the "qhorus" packages config:
 
 ```
 quarkus.hibernate-orm.qhorus.datasource=qhorus
 quarkus.hibernate-orm.qhorus.packages=\
-  io.quarkiverse.qhorus.runtime,\
-  io.quarkiverse.ledger.runtime
+  io.casehub.qhorus.runtime,\
+  io.casehub.ledger.runtime
 ```
 
 This means ledger base tables (`ledger_entry`, supplements) live in the Qhorus
