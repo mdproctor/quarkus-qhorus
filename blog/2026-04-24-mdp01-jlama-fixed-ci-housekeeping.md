@@ -37,4 +37,4 @@ One XML comment in `pom.xml` with `--` in it — from copy-pasting an error mess
 
 ## casehubio
 
-The repo moved to `github.com/casehubio/quarkus-qhorus` — the same org as `quarkus-ledger`. The `gh api -X POST repos/.../transfer` call returns 200 immediately but the transfer is asynchronous; polling `gh repo view casehubio/...` returns "not found" for 30-odd seconds before it resolves. Three file updates, one remote URL change, push from the new location. Clean.
+The repo moved to `github.com/casehubio/qhorus` — the same org as `quarkus-ledger`. The `gh api -X POST repos/.../transfer` call returns 200 immediately but the transfer is asynchronous; polling `gh repo view casehubio/...` returns "not found" for 30-odd seconds before it resolves. Three file updates, one remote URL change, push from the new location. Clean.

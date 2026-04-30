@@ -11,7 +11,7 @@ tags: [mcp, error-handling, claudony, ledger, adr]
 
 This session started with finishing Phase 12 (structured observability) and ended with a decision about error handling that touched every tool in the codebase.
 
-Phase 12 had shipped in the previous session — `AgentMessageLedgerEntry`, `LedgerWriteService`, `list_events`, `get_channel_timeline`. What remained was making the quarkus-ledger extension itself standalone. We extracted it from quarkus-tarkus into its own Quarkiverse extension at `~/claude/quarkus-ledger`, wrote the DESIGN.md and integration guide, fixed the `@ConfigRoot` annotation (without it, `quarkus.ledger.*` config keys appear as "Unrecognized" in startup logs even when the defaults apply correctly), and got it to 33 tests. The pattern — shared ledger infrastructure as a separate extension — was the right call. Both quarkus-tarkus and Qhorus were already using it.
+Phase 12 had shipped in the previous session — `AgentMessageLedgerEntry`, `LedgerWriteService`, `list_events`, `get_channel_timeline`. What remained was making the quarkus-ledger extension itself standalone. We extracted it from quarkus-tarkus into its own Quarkiverse extension at `~/claude/casehub/ledger`, wrote the DESIGN.md and integration guide, fixed the `@ConfigRoot` annotation (without it, `quarkus.ledger.*` config keys appear as "Unrecognized" in startup logs even when the defaults apply correctly), and got it to 33 tests. The pattern — shared ledger infrastructure as a separate extension — was the right call. Both quarkus-tarkus and Qhorus were already using it.
 
 Then the error handling question.
 

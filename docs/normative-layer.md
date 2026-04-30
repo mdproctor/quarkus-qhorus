@@ -581,4 +581,4 @@ own data source. Extension, not duplication.
 
 *Quarkus Qhorus — the agent communication mesh for the Quarkus Native AI Agent Ecosystem.*
 *Theoretical foundation documented in ADR-0005. Empirical hypothesis at [engine#189](https://github.com/casehubio/engine/issues/189).*
-*Platform context: [CaseHub Platform](https://github.com/casehubio/casehub-parent/blob/main/docs/PLATFORM.md).*
+*Platform context: [CaseHub Platform](https://github.com/casehubio/parent/blob/main/docs/PLATFORM.md).*

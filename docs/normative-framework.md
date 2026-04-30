@@ -71,6 +71,6 @@ reliably distinguish FAILURE from DECLINE; with it, they always can.
 
 ---
 
-*Part of the [CaseHub platform](https://github.com/casehubio/casehub-parent/blob/main/docs/PLATFORM.md).
-Normative layer implemented in [casehubio/quarkus-qhorus](https://github.com/casehubio/quarkus-qhorus).
+*Part of the [CaseHub platform](https://github.com/casehubio/parent/blob/main/docs/PLATFORM.md).
+Normative layer implemented in [casehubio/qhorus](https://github.com/casehubio/qhorus).
 Theoretical foundation documented in ADR-0005.*

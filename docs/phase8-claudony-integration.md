@@ -22,7 +22,7 @@ event observability (Phase 12). Any Quarkus app that adds it gets 39 MCP tools i
 Claudony wraps it — Qhorus doesn't know or care that it's inside Claudony.
 
 The full design rationale is in:
-`~/claude/quarkus-qhorus/docs/specs/2026-04-13-qhorus-design.md` §"Embedded in Claudony"
+`~/claude/casehub/qhorus/docs/specs/2026-04-13-qhorus-design.md` §"Embedded in Claudony"
 
 ---
 
@@ -182,7 +182,7 @@ INFO features: [agroal, cdi, hibernate-orm, ledger, mcp-server-http, qhorus, res
 
 Run Qhorus's existing test suite to verify nothing regressed:
 ```bash
-cd ~/claude/quarkus-qhorus
+cd ~/claude/casehub/qhorus
 JAVA_HOME=$(/usr/libexec/java_home -v 26) mvn test -pl runtime -Dno-format
 # Expect: 557 tests, 0 failures
 ```
@@ -195,4 +195,4 @@ Nothing. Qhorus is complete through Phase 12. The embedding is purely additive �
 Claudony takes a dependency, Qhorus doesn't change.
 
 If something in Qhorus does need to change to support the embedding, open an issue
-in `casehubio/quarkus-qhorus` and the qhorus session picks it up.
+in `casehubio/qhorus` and the qhorus session picks it up.
