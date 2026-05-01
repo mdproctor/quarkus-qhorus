@@ -8,7 +8,10 @@ it fits into the broader agent communication landscape.
 
 ## Reading Order
 
-**Start here if you are new to the normative layer:**
+**Start here if you want to build with Qhorus:**
+→ [Agent Mesh Framework — Developer Guide](agent-mesh-framework.md) — message vocabulary, channel topology, agent lifecycle, Layer 1 example
+
+**Start here if you want to understand the theory:**
 → [The Qhorus Normative Layer](normative-layer.md) — the thesis, the theory, the worked examples
 
 **Then read this to see how it compares:**
@@ -22,6 +25,17 @@ complementary rather than competing
 ---
 
 ## What Each Document Covers
+
+### [agent-mesh-framework.md](agent-mesh-framework.md)
+The developer guide. Covers:
+- The 9 message types in three groups — information exchange, obligation lifecycle, telemetry
+- Channel semantics and the NormativeChannelLayout (3-channel topology)
+- Agent lifecycle — register, announce, work loop, completion
+- The CommitmentStore — the 7-state obligation lifecycle
+- The normative ledger — 7 query tools and when to use each
+- Human-in-the-loop — oversight channel, approval gate, watchdogs
+- Layer 1 example: Secure Code Review, fully annotated
+- Anti-patterns and quick-start template
 
 ### [normative-layer.md](normative-layer.md)
 The foundational document. Covers:
