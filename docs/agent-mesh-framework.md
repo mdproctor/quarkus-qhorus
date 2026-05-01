@@ -517,7 +517,7 @@ channel          — the channel name
 actor_id         — who sent the message
 message_type     — one of the 9 types
 correlation_id   — links the entry to an obligation chain
-caused_by_entry  — UUID of the parent entry (for HANDOFF chains)
+caused_by_entry  — UUID of the parent entry; spans channels — may reference an entry in a different channel
 content          — the message body
 hash             — SHA-256 of this entry's content + previous hash (tamper evidence)
 occurred_at      — wall-clock timestamp
@@ -531,11 +531,13 @@ if present — these feed the telemetry aggregation tools.
 
 ```
 get_obligation_activity(correlation_id, limit?)
-# → ALL entries across ALL channels sharing this correlationId, ordered chronologically
+# → returns the complete cross-channel causal narrative for an obligation
+# → includes ALL entries sharing this correlationId across ALL channels
+# → follows causedByEntryId links across channel boundaries, capturing entries
+#   that carry a different correlationId (e.g. an oversight escalation triggered
+#   by the original work COMMAND — different correlationId, but causally linked)
 # → each entry includes a 'channel' field showing which channel it belongs to
-# → use this first: reconstructs the full cross-channel picture in one call
-# → tip: agents should pass the obligation's correlationId when sending EVENT messages
-#   to the observe channel — those EVENTs then appear here alongside the obligation
+# → this is the primary audit and debugging tool — one call returns the full story
 
 list_ledger_entries(channel_name, ...)
 # → all entries in a channel; filter by type, sender, since, correlation_id
@@ -545,9 +547,10 @@ get_obligation_chain(channel_name, correlation_id)
 # → complete history of one obligation: initiator, participants, elapsed time,
 #   handoff count, resolution, live CommitmentStore state
 
-get_causal_chain(channel_name, ledger_entry_id)
-# → walk causedByEntryId links upward to the root
+get_causal_chain(ledger_entry_id)
+# → walk causedByEntryId links upward to the root, crossing channel boundaries
 # → use this to trace: "what chain of events led to this FAILURE?"
+# → returns entries from any channel in causal order
 
 list_stalled_obligations(channel_name, older_than_seconds)
 # → COMMAND entries with no terminal sibling, older than threshold
@@ -576,11 +579,56 @@ entry e2: HANDOFF  (agent-A    → agent-B)    causedByEntryId: e1
 entry e3: HANDOFF  (agent-B    → agent-C)    causedByEntryId: e2
 entry e4: DONE     (agent-C    → coordinator) causedByEntryId: e3
 
-get_causal_chain(channel, e4) → [e1, e2, e3, e4]  ← complete ancestry
+get_causal_chain(e4) → [e1, e2, e3, e4]  ← complete ancestry
 ```
 
 Six months later: `get_causal_chain` on the DONE entry returns the complete ancestry.
 The FCA asks "who was responsible at each step?" — the chain is in the ledger.
+
+### Cross-channel causal links — the unified narrative
+
+`causedByEntryId` is a UUID reference that resolves across all channels. An entry in the
+work channel can causally link to an entry in the oversight channel; an entry in the
+oversight channel can causally link back to work. Each channel maintains its own
+tamper-evident hash chain — integrity is per-chain — but causal provenance is navigable
+across chains.
+
+This means `get_obligation_activity` is not a correlationId join. It walks the causal
+DAG. Consider a case where a work COMMAND triggers an oversight escalation that must
+resolve before the work DONE can be posted:
+
+```
+work/COMMAND    (correlationId: corr-001)       causedByEntryId: null
+  observe/EVENT  (correlationId: corr-001)       causedByEntryId: work/COMMAND
+  observe/EVENT  (correlationId: corr-001)       causedByEntryId: work/COMMAND
+  oversight/QUERY (correlationId: corr-human-001) causedByEntryId: work/COMMAND
+    oversight/COMMAND (correlationId: corr-human-001) causedByEntryId: oversight/QUERY
+work/DONE       (correlationId: corr-001)       causedByEntryId: oversight/COMMAND
+```
+
+The oversight entries carry a different `correlationId` — they belong to a separate
+human escalation thread. A correlationId-only query would miss them entirely.
+`get_obligation_activity` follows the causal DAG:
+
+```
+get_obligation_activity("corr-001")
+
+→ [
+    { channel: "case-abc/work",      type: "COMMAND",  actor: "coordinator",   ... },
+    { channel: "case-abc/observe",   type: "EVENT",    actor: "reviewer-001",  tool: "read_file", ... },
+    { channel: "case-abc/observe",   type: "EVENT",    actor: "reviewer-001",  tool: "web_search", ... },
+    { channel: "case-abc/oversight", type: "QUERY",    actor: "reviewer-001",  content: "Include finding #2?", ... },
+    { channel: "case-abc/oversight", type: "COMMAND",  actor: "human",         content: "Yes — flag as low confidence.", ... },
+    { channel: "case-abc/work",      type: "DONE",     actor: "reviewer-001",  ... }
+  ]
+```
+
+One call. The complete causal story — machine obligations, telemetry, and human governance —
+in causal order. Not three separate timelines.
+
+This is also what makes `get_causal_chain` on a DONE entry fully meaningful. Previously,
+walking `causedByEntryId` stopped at the channel boundary. Now the chain traces back through
+every channel that contributed to the outcome.
 
 ---
 
@@ -1070,8 +1118,8 @@ unchanged. The only thing that changes is what provides the agents.
 - `list_pending_commitments()`
 - `list_stalled_obligations(channelName, olderThanSeconds?)`
 - `get_obligation_chain(channelName, correlationId)`
-- `get_causal_chain(channelName, ledgerEntryId)`
-- `get_obligation_activity(correlationId, includeContentSearch?, limit?)` — cross-channel view of all entries for one obligation
+- `get_causal_chain(ledgerEntryId)` — walks causedByEntryId to root, crossing channel boundaries
+- `get_obligation_activity(correlationId, limit?)` — complete cross-channel causal narrative: correlationId match + causedByEntryId DAG traversal across channels
 - `list_ledger_entries(channelName, typeFilter?, sender?, since?, afterId?, correlationId?, sort?, limit?)`
 - `get_telemetry_summary(channelName, since?)`
 - `get_channel_timeline(channelName, afterId?, limit?)`

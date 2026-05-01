@@ -100,25 +100,20 @@ define a promotion path to core — is the right governance mechanism.
 
 ## Gaps and Critique
 
-### 1. Cross-Channel Causal Correlation
+### 1. Cross-Channel Causal Correlation *(implemented)*
 
-This is the most significant architectural gap. `causedByEntryId` runs within a
-channel. The causal link from `oversight/QUERY` through a WorkItem lifecycle to
-`work/DONE` spans three separate ledger chains — and is not yet representable in
-a single query.
+`causedByEntryId` is a UUID reference that resolves across all channels. An
+oversight COMMAND can causally link to a work DONE; `get_causal_chain` now
+traverses channel boundaries. `get_obligation_activity` walks the full causal
+DAG — not just correlationId — so oversight escalations with a different
+correlationId appear in the narrative alongside the work obligation that
+triggered them. See Part 6 of `agent-mesh-framework.md`.
 
-`get_obligation_activity` is a pragmatic first step: query by `correlationId`
-across channels. But it works by convention (agents must pass `correlationId` on
-EVENT messages; if they don't, those entries are invisible). The full picture
-requires cross-channel causal links as first-class UUID references in a navigable
-DAG — not correlated by convention, but linked structurally.
-
-Until this is in place, the "six months later, prove what happened" audit story
-requires assembly. The auditor gets three separate timelines. The unified causal
-narrative is not one query.
-
-The work document names this as ProvenanceLink (PROV-O graph across agents,
-cases, and WorkItems). It needs formal specification.
+The remaining open question is ProvenanceLink (PROV-O graph across agents,
+cases, and WorkItems) — the formal specification of the broader causal graph
+once WorkItem audit entries participate in the same DAG as Qhorus ledger
+entries. The cross-channel foundation is in place; WorkItem integration is the
+next step.
 
 ### 2. WorkItem Integration into Trust Scoring
 
@@ -185,9 +180,10 @@ to be written.
 
 In rough priority order:
 
-1. **Cross-channel correlation specification** — Define the PROV-O DAG model
-   formally. Specify how cross-channel causal links are structured, stored, and
-   queried. This is the single most important architectural gap.
+1. **ProvenanceLink specification** — Cross-channel causal links are implemented.
+   The next step is specifying how WorkItem audit entries participate in the same
+   causal DAG as Qhorus ledger entries, enabling a full PROV-O graph across
+   agents, cases, and human obligations.
 
 2. **WorkItem → LedgerAttestation path** — Specify the attestation model for
    human obligations. Define how COMPLETED, REJECTED, and EXPIRED WorkItems
