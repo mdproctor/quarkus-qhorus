@@ -32,7 +32,7 @@ class DeleteChannelToolTest {
         String name = "del-tool-empty-" + System.nanoTime();
         QuarkusTransaction.requiringNew().run(() -> channelService.create(name, "Test", ChannelSemantic.APPEND, null));
 
-        DeleteChannelResult result = QuarkusTransaction.requiringNew().call(() -> tools.deleteChannel(name, false));
+        DeleteChannelResult result = QuarkusTransaction.requiringNew().call(() -> tools.deleteChannel(name, false, null));
 
         assertEquals(name, result.channelName());
         assertEquals(0L, result.messagesDeleted());
@@ -50,7 +50,7 @@ class DeleteChannelToolTest {
                 .run(() -> messageService.send(chId[0], "agent-a", MessageType.STATUS, "hi", null, null));
 
         Exception ex = assertThrows(Exception.class,
-                () -> QuarkusTransaction.requiringNew().run(() -> tools.deleteChannel(name, false)));
+                () -> QuarkusTransaction.requiringNew().run(() -> tools.deleteChannel(name, false, null)));
         assertTrue(ex.getMessage().contains("1"),
                 "Error message should include message count: " + ex.getMessage());
     }
@@ -67,7 +67,7 @@ class DeleteChannelToolTest {
             messageService.send(chId[0], "agent-b", MessageType.STATUS, "two", null, null);
         });
 
-        DeleteChannelResult result = QuarkusTransaction.requiringNew().call(() -> tools.deleteChannel(name, true));
+        DeleteChannelResult result = QuarkusTransaction.requiringNew().call(() -> tools.deleteChannel(name, true, null));
 
         assertEquals(2L, result.messagesDeleted());
         assertEquals("deleted", result.status());
@@ -76,14 +76,14 @@ class DeleteChannelToolTest {
     @Test
     void deleteChannel_notFound_throwsIllegalArgument() {
         assertThrows(Exception.class,
-                () -> QuarkusTransaction.requiringNew().run(() -> tools.deleteChannel("no-such-" + System.nanoTime(), false)));
+                () -> QuarkusTransaction.requiringNew().run(() -> tools.deleteChannel("no-such-" + System.nanoTime(), false, null)));
     }
 
     @Test
     void deleteChannel_afterDeletion_channelNoLongerListed() {
         String name = "del-tool-gone-" + System.nanoTime();
         QuarkusTransaction.requiringNew().run(() -> channelService.create(name, "Test", ChannelSemantic.APPEND, null));
-        QuarkusTransaction.requiringNew().run(() -> tools.deleteChannel(name, false));
+        QuarkusTransaction.requiringNew().run(() -> tools.deleteChannel(name, false, null));
 
         QuarkusTransaction.requiringNew().run(() -> assertTrue(channelService.findByName(name).isEmpty()));
     }
@@ -107,7 +107,7 @@ class DeleteChannelToolTest {
     void deleteChannel_withAdminList_authorizedCallerAllowed() {
         String name = "del-admin-ok-" + System.nanoTime();
         QuarkusTransaction.requiringNew().run(() -> {
-            tools.createChannel(name, "Admin-guarded", null, null);
+            tools.createChannel(name, "Admin-guarded", null, null, null, null, null, null, null);
             tools.setChannelAdmins(name, "admin-agent");
         });
 
@@ -120,7 +120,7 @@ class DeleteChannelToolTest {
     void deleteChannel_withAdminList_unauthorizedCallerRejected() {
         String name = "del-admin-reject-" + System.nanoTime();
         QuarkusTransaction.requiringNew().run(() -> {
-            tools.createChannel(name, "Admin-guarded", null, null);
+            tools.createChannel(name, "Admin-guarded", null, null, null, null, null, null, null);
             tools.setChannelAdmins(name, "admin-agent");
         });
 
@@ -137,7 +137,7 @@ class DeleteChannelToolTest {
     void deleteChannel_withAdminList_noCallerIdRejected() {
         String name = "del-admin-nocaller-" + System.nanoTime();
         QuarkusTransaction.requiringNew().run(() -> {
-            tools.createChannel(name, "Admin-guarded", null, null);
+            tools.createChannel(name, "Admin-guarded", null, null, null, null, null, null, null);
             tools.setChannelAdmins(name, "admin-agent");
         });
 

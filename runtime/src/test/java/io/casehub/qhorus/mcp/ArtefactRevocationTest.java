@@ -78,7 +78,7 @@ class ArtefactRevocationTest {
         String artefactId = artefact.artefactId().toString();
 
         // Bob claims it
-        tools.register("rev-bob", "Bob", java.util.List.of(), null);
+        tools.register("rev-bob", "Bob", java.util.List.of(), null, null);
         var instances = tools.listInstances(null);
         String bobUuid = instances.stream()
                 .filter(i -> "rev-bob".equals(i.instanceId()))
@@ -123,7 +123,7 @@ class ArtefactRevocationTest {
         String artefactId = artefact.artefactId().toString();
 
         // Register an instance and claim the artefact
-        tools.register("rev-agent", "Agent", java.util.List.of(), null);
+        tools.register("rev-agent", "Agent", java.util.List.of(), null, null);
         // claimArtefact takes artefact UUID and instance UUID
         // instance UUID is the internal UUID, not instanceId. We'd need to look it up.
         // For this test, just verify revocation deletes everything cleanly.
@@ -168,19 +168,18 @@ class ArtefactRevocationTest {
     void e2eRevokedArtefactRefInMessageIsHarmless() {
         // Artefact ref in a message still works even after the artefact is revoked
         // (the ref is stored as a string — revocation doesn't cascade to messages)
-        tools.createChannel("rev-e2e-2", "Test", null, null);
+        tools.createChannel("rev-e2e-2", "Test", null, null, null, null, null, null, null);
         QhorusMcpTools.ArtefactDetail artefact = tools.shareArtefact("rev-e2e-data-2", "Test", "alice", "data", false, true);
         String artefactId = artefact.artefactId().toString();
 
         // Send message referencing the artefact
-        tools.sendMessage("rev-e2e-2", "alice", "command", "see attached",
-                null, null, java.util.List.of(artefactId), null);
+        tools.sendMessage("rev-e2e-2", "alice", "command", "see attached", null, null, java.util.List.of(artefactId), null, null);
 
         // Revoke the artefact
         tools.revokeArtefact(artefactId);
 
         // Message still exists (revocation doesn't delete messages)
-        QhorusMcpTools.CheckResult check = tools.checkMessages("rev-e2e-2", 0L, 10, null);
+        QhorusMcpTools.CheckResult check = tools.checkMessages("rev-e2e-2", 0L, 10, null, null, null);
         assertEquals(1, check.messages().size(), "message should still exist after artefact revoked");
         // But the artefact ref now points to nothing
         assertThrows(Exception.class, () -> tools.getArtefact(null, artefactId));

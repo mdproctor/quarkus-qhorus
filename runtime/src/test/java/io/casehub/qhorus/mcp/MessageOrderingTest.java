@@ -68,7 +68,7 @@ class MessageOrderingTest {
 
         try {
             CheckResult result = QuarkusTransaction.requiringNew().call(
-                    () -> tools.checkMessages(ch, 0L, 100, null));
+                    () -> tools.checkMessages(ch, 0L, 100, null, null, null));
 
             assertEquals(10, result.messages().size());
 
@@ -117,7 +117,7 @@ class MessageOrderingTest {
 
         try {
             CheckResult result = QuarkusTransaction.requiringNew().call(
-                    () -> tools.checkMessages(ch, 0L, 100, null));
+                    () -> tools.checkMessages(ch, 0L, 100, null, null, null));
 
             assertEquals(5, result.messages().size());
             for (int i = 1; i < result.messages().size(); i++) {
@@ -157,7 +157,7 @@ class MessageOrderingTest {
 
         try {
             CheckResult result = QuarkusTransaction.requiringNew().call(
-                    () -> tools.checkMessages(ch, 0L, 100, null));
+                    () -> tools.checkMessages(ch, 0L, 100, null, null, null));
 
             assertNull(result.barrierStatus(), "barrier must have released");
             assertEquals(3, result.messages().size());
@@ -208,7 +208,7 @@ class MessageOrderingTest {
             for (int page = 0; page < 4; page++) { // enough passes to cover all 15
                 final long finalCursor = cursor;
                 CheckResult pageResult = QuarkusTransaction.requiringNew().call(
-                        () -> tools.checkMessages(ch, finalCursor, pageSize, null));
+                        () -> tools.checkMessages(ch, finalCursor, pageSize, null, null, null));
                 if (pageResult.messages().isEmpty()) {
                     break;
                 }
@@ -257,7 +257,7 @@ class MessageOrderingTest {
         try {
             // First read: get the first 2, recording their IDs
             CheckResult firstBatch = QuarkusTransaction.requiringNew().call(
-                    () -> tools.checkMessages(ch, 0L, 2, null));
+                    () -> tools.checkMessages(ch, 0L, 2, null, null, null));
             assertEquals(2, firstBatch.messages().size(), "first EPHEMERAL read with limit=2");
             // Verify ascending
             assertTrue(firstBatch.messages().get(1).messageId() > firstBatch.messages().get(0).messageId(),
@@ -266,7 +266,7 @@ class MessageOrderingTest {
             // Second read with cursor from first batch: delivers remaining messages
             final long lastId = firstBatch.lastId();
             CheckResult secondBatch = QuarkusTransaction.requiringNew().call(
-                    () -> tools.checkMessages(ch, lastId, 10, null));
+                    () -> tools.checkMessages(ch, lastId, 10, null, null, null));
             assertEquals(3, secondBatch.messages().size(),
                     "EPHEMERAL second read (cursor past first 2) must deliver remaining 3 messages");
             // Verify all IDs are > firstBatch's lastId and in ascending order

@@ -70,7 +70,7 @@ class BarrierConcurrentWriteTest {
 
             // Barrier should still be blocked — alice's EVENT doesn't count
             CheckResult afterEvent = QuarkusTransaction.requiringNew().call(
-                    () -> tools.checkMessages(ch, 0L, 10, null));
+                    () -> tools.checkMessages(ch, 0L, 10, null, null, null));
             assertTrue(afterEvent.messages().isEmpty(),
                     "Barrier must not release after alice sends only an EVENT");
             assertNotNull(afterEvent.barrierStatus());
@@ -90,7 +90,7 @@ class BarrierConcurrentWriteTest {
             });
 
             CheckResult afterBothNonEvent = QuarkusTransaction.requiringNew().call(
-                    () -> tools.checkMessages(ch, 0L, 10, null));
+                    () -> tools.checkMessages(ch, 0L, 10, null, null, null));
             assertNull(afterBothNonEvent.barrierStatus(),
                     "BARRIER must release once alice sent a non-EVENT and bob has written");
             // The payload includes alice's STATUS and bob's STATUS (not alice's EVENT)
@@ -169,7 +169,7 @@ class BarrierConcurrentWriteTest {
 
             // All three committed — barrier must release
             CheckResult result = QuarkusTransaction.requiringNew().call(
-                    () -> tools.checkMessages(ch, 0L, 10, null));
+                    () -> tools.checkMessages(ch, 0L, 10, null, null, null));
 
             assertNull(result.barrierStatus(),
                     "BARRIER must release after all 3 contributors have written, even concurrently");
@@ -210,7 +210,7 @@ class BarrierConcurrentWriteTest {
             });
 
             CheckResult result = QuarkusTransaction.requiringNew().call(
-                    () -> tools.checkMessages(ch, 0L, 10, null));
+                    () -> tools.checkMessages(ch, 0L, 10, null, null, null));
 
             assertNull(result.barrierStatus(),
                     "BARRIER with 'alice,,bob' should release when alice and bob have written; " +
@@ -247,7 +247,7 @@ class BarrierConcurrentWriteTest {
 
             // Check BETWEEN alice and bob — must stay blocked
             CheckResult midCheck = QuarkusTransaction.requiringNew().call(
-                    () -> tools.checkMessages(ch, 0L, 10, null));
+                    () -> tools.checkMessages(ch, 0L, 10, null, null, null));
             assertTrue(midCheck.messages().isEmpty(),
                     "BARRIER must not release after only alice writes; bob is still pending");
             assertNotNull(midCheck.barrierStatus());
@@ -263,7 +263,7 @@ class BarrierConcurrentWriteTest {
 
             // Now both have written — must release with BOTH messages
             CheckResult releaseCheck = QuarkusTransaction.requiringNew().call(
-                    () -> tools.checkMessages(ch, 0L, 10, null));
+                    () -> tools.checkMessages(ch, 0L, 10, null, null, null));
             assertNull(releaseCheck.barrierStatus(),
                     "BARRIER must release once both alice and bob have written");
             assertEquals(2, releaseCheck.messages().size(),

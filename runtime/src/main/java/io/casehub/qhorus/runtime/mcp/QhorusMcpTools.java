@@ -30,12 +30,6 @@ import io.casehub.qhorus.runtime.instance.InstanceService;
 import io.casehub.qhorus.runtime.ledger.LedgerWriteService;
 import io.casehub.qhorus.runtime.ledger.MessageLedgerEntry;
 import io.casehub.qhorus.runtime.ledger.MessageLedgerEntryRepository;
-import io.casehub.qhorus.runtime.mcp.QhorusMcpToolsBase.CausalChainEntry;
-import io.casehub.qhorus.runtime.mcp.QhorusMcpToolsBase.ObligationChainSummary;
-import io.casehub.qhorus.runtime.mcp.QhorusMcpToolsBase.ObligationStats;
-import io.casehub.qhorus.runtime.mcp.QhorusMcpToolsBase.StalledObligation;
-import io.casehub.qhorus.runtime.mcp.QhorusMcpToolsBase.TelemetrySummary;
-import io.casehub.qhorus.runtime.mcp.QhorusMcpToolsBase.ToolTelemetry;
 import io.casehub.qhorus.runtime.message.Commitment;
 import io.casehub.qhorus.runtime.message.Message;
 import io.casehub.qhorus.runtime.message.MessageService;
@@ -123,7 +117,7 @@ public class QhorusMcpTools extends QhorusMcpToolsBase {
 
     /** Backward-compat overload — no read_only param. */
     @Transactional
-    public RegisterResponse register(String instanceId, String description, List<String> capabilities,
+    RegisterResponse register(String instanceId, String description, List<String> capabilities,
             String claudonySessionId) {
         return register(instanceId, description, capabilities, claudonySessionId, null);
     }
@@ -187,25 +181,25 @@ public class QhorusMcpTools extends QhorusMcpToolsBase {
     // ---------------------------------------------------------------------------
 
     /** Convenience overload — no ACL or rate limits. Used by tests and internal callers. */
-    public ChannelDetail createChannel(String name, String description, String semantic, String barrierContributors) {
+    ChannelDetail createChannel(String name, String description, String semantic, String barrierContributors) {
         return createChannel(name, description, semantic, barrierContributors, null, null, null, null, null);
     }
 
     /** Convenience overload — allowed_writers but no admin_instances or rate limits. */
-    public ChannelDetail createChannel(String name, String description, String semantic, String barrierContributors,
+    ChannelDetail createChannel(String name, String description, String semantic, String barrierContributors,
             String allowedWriters) {
         return createChannel(name, description, semantic, barrierContributors, allowedWriters, null, null, null, null);
     }
 
     /** Convenience overload — allowed_writers and admin_instances but no rate limits. */
-    public ChannelDetail createChannel(String name, String description, String semantic, String barrierContributors,
+    ChannelDetail createChannel(String name, String description, String semantic, String barrierContributors,
             String allowedWriters, String adminInstances) {
         return createChannel(name, description, semantic, barrierContributors, allowedWriters, adminInstances, null,
                 null, null);
     }
 
     /** Convenience overload — full 8-param (rate limits) but no allowed_types. Backward compatibility for tests. */
-    public ChannelDetail createChannel(String name, String description, String semantic, String barrierContributors,
+    ChannelDetail createChannel(String name, String description, String semantic, String barrierContributors,
             String allowedWriters, String adminInstances, Integer rateLimitPerChannel, Integer rateLimitPerInstance) {
         return createChannel(name, description, semantic, barrierContributors, allowedWriters, adminInstances,
                 rateLimitPerChannel, rateLimitPerInstance, null);
@@ -304,7 +298,7 @@ public class QhorusMcpTools extends QhorusMcpToolsBase {
     // ---------------------------------------------------------------------------
 
     /** Convenience overload — no caller identity (open governance assumed). */
-    public ChannelDetail pauseChannel(String channelName) {
+    ChannelDetail pauseChannel(String channelName) {
         return pauseChannel(channelName, null);
     }
 
@@ -322,7 +316,7 @@ public class QhorusMcpTools extends QhorusMcpToolsBase {
     }
 
     /** Convenience overload — no caller identity (open governance assumed). */
-    public ChannelDetail resumeChannel(String channelName) {
+    ChannelDetail resumeChannel(String channelName) {
         return resumeChannel(channelName, null);
     }
 
@@ -340,7 +334,7 @@ public class QhorusMcpTools extends QhorusMcpToolsBase {
     }
 
     /** Convenience overload — no caller identity (open governance assumed). */
-    public DeleteChannelResult deleteChannel(String channelName, Boolean force) {
+    DeleteChannelResult deleteChannel(String channelName, Boolean force) {
         return deleteChannel(channelName, force, null);
     }
 
@@ -362,7 +356,7 @@ public class QhorusMcpTools extends QhorusMcpToolsBase {
     }
 
     /** Convenience overload — no caller identity (open governance assumed). */
-    public ForceReleaseResult forceReleaseChannel(String channelName, String reason) {
+    ForceReleaseResult forceReleaseChannel(String channelName, String reason) {
         return forceReleaseChannel(channelName, reason, null);
     }
 
@@ -406,7 +400,7 @@ public class QhorusMcpTools extends QhorusMcpToolsBase {
     // ---------------------------------------------------------------------------
 
     /** Convenience overload — no artefact refs, target, or deadline. Used by tests and internal callers. */
-    public MessageResult sendMessage(String channelName, String sender, String type,
+    MessageResult sendMessage(String channelName, String sender, String type,
             String content, String correlationId, Long inReplyTo) {
         return sendMessage(channelName, sender, type, content, correlationId, inReplyTo, null, null, null);
     }
@@ -416,7 +410,7 @@ public class QhorusMcpTools extends QhorusMcpToolsBase {
      * for test callers that pre-date the target and deadline fields. The non-{@code @Tool} annotation here
      * is intentional — only the full method is exposed to MCP.
      */
-    public MessageResult sendMessage(String channelName, String sender, String type,
+    MessageResult sendMessage(String channelName, String sender, String type,
             String content, String correlationId, Long inReplyTo, List<String> artefactRefs) {
         return sendMessage(channelName, sender, type, content, correlationId, inReplyTo, artefactRefs, null, null);
     }
@@ -425,7 +419,7 @@ public class QhorusMcpTools extends QhorusMcpToolsBase {
      * Convenience overload — artefact refs and target but no deadline. Maintains backward compatibility
      * for test callers that supply artefact refs and/or target without a deadline.
      */
-    public MessageResult sendMessage(String channelName, String sender, String type,
+    MessageResult sendMessage(String channelName, String sender, String type,
             String content, String correlationId, Long inReplyTo, List<String> artefactRefs, String target) {
         return sendMessage(channelName, sender, type, content, correlationId, inReplyTo, artefactRefs, target, null);
     }
@@ -630,12 +624,12 @@ public class QhorusMcpTools extends QhorusMcpToolsBase {
     }
 
     /** Backward-compat overload — no reader_instance_id filter, no include_events. */
-    public CheckResult checkMessages(String channelName, Long afterId, Integer limit, String sender) {
+    CheckResult checkMessages(String channelName, Long afterId, Integer limit, String sender) {
         return checkMessages(channelName, afterId, limit, sender, null, null);
     }
 
     /** Backward-compat overload — no include_events. */
-    public CheckResult checkMessages(String channelName, Long afterId, Integer limit, String sender,
+    CheckResult checkMessages(String channelName, Long afterId, Integer limit, String sender,
             String readerInstanceId) {
         return checkMessages(channelName, afterId, limit, sender, readerInstanceId, null);
     }
@@ -760,11 +754,11 @@ public class QhorusMcpTools extends QhorusMcpToolsBase {
     }
 
     /** Backward-compat overload — no reader_instance_id filter. */
-    public List<MessageSummary> getReplies(Long messageId) {
+    List<MessageSummary> getReplies(Long messageId) {
         return getReplies(messageId, null, null, null);
     }
 
-    public List<MessageSummary> getReplies(Long messageId, String readerInstanceId) {
+    List<MessageSummary> getReplies(Long messageId, String readerInstanceId) {
         return getReplies(messageId, readerInstanceId, null, null);
     }
 
@@ -790,7 +784,7 @@ public class QhorusMcpTools extends QhorusMcpToolsBase {
     }
 
     /** Backward-compat overload — no reader_instance_id filter. */
-    public List<MessageSummary> searchMessages(String query, String channelName, Integer limit) {
+    List<MessageSummary> searchMessages(String query, String channelName, Integer limit) {
         return searchMessages(query, channelName, limit, null);
     }
 
@@ -920,15 +914,15 @@ public class QhorusMcpTools extends QhorusMcpToolsBase {
             @ToolArg(name = "content", description = "The approval request content shown to the human") String content,
             @ToolArg(name = "timeout_seconds", description = "Seconds to wait for human response (default 300)", required = false) Integer timeoutS) {
         String correlationId = UUID.randomUUID().toString();
-        return requestApproval(channelName, content, correlationId, timeoutS);
+        return requestApprovalWithCorrelationId(channelName, content, correlationId, timeoutS);
     }
 
     /**
      * Testability overload — accepts a pre-supplied correlationId so tests can pre-seed the response.
      * Not exposed as an MCP tool.
      */
-    public WaitResult requestApproval(String channelName, String content, String correlationId,
-            Integer timeoutS) {
+    public WaitResult requestApprovalWithCorrelationId(String channelName, String content, String correlationId,
+                                                       Integer timeoutS) {
         int timeout = timeoutS != null ? timeoutS : 300;
         sendMessage(channelName, "agent", "query", content, correlationId, null, null, null, null);
         return waitForReply(channelName, correlationId, timeout, null);
@@ -1210,7 +1204,7 @@ public class QhorusMcpTools extends QhorusMcpToolsBase {
     }
 
     /** Convenience overload — no caller identity (open governance assumed). */
-    public ClearChannelResult clearChannel(String channelName) {
+    ClearChannelResult clearChannel(String channelName) {
         return clearChannel(channelName, null);
     }
 
@@ -1326,7 +1320,7 @@ public class QhorusMcpTools extends QhorusMcpToolsBase {
     // ---------------------------------------------------------------------------
 
     /** Backward-compat overload — no correlation_id or sort. Used by existing tests. */
-    public List<Map<String, Object>> listLedgerEntries(String channelName, String typeFilter,
+    List<Map<String, Object>> listLedgerEntries(String channelName, String typeFilter,
             String agentId, String since, Long afterId, int limit) {
         return listLedgerEntries(channelName, typeFilter, agentId, since, afterId,
                 null, null, limit);

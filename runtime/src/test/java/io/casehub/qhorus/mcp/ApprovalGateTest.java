@@ -59,7 +59,7 @@ class ApprovalGateTest {
     @Test
     @TestTransaction
     void respondToApprovalCreatesResponseMessageInChannel() {
-        tools.createChannel("ag-respond-1", "Approvals", null, null);
+        tools.createChannel("ag-respond-1", "Approvals", null, null, null, null, null, null, null);
         String corrId = UUID.randomUUID().toString();
 
         QhorusMcpTools.MessageResult result = tools.respondToApproval(corrId, "approved — looks good", "ag-respond-1");
@@ -72,12 +72,12 @@ class ApprovalGateTest {
     @Test
     @TestTransaction
     void respondToApprovalSenderIsHuman() {
-        tools.createChannel("ag-respond-2", "Approvals", null, null);
+        tools.createChannel("ag-respond-2", "Approvals", null, null, null, null, null, null, null);
         String corrId = UUID.randomUUID().toString();
 
         tools.respondToApproval(corrId, "denied", "ag-respond-2");
 
-        QhorusMcpTools.CheckResult check = tools.checkMessages("ag-respond-2", 0L, 10, null);
+        QhorusMcpTools.CheckResult check = tools.checkMessages("ag-respond-2", 0L, 10, null, null, null);
         assertEquals("human", check.messages().get(0).sender(),
                 "respond_to_approval should use 'human' as the sender");
     }
@@ -85,7 +85,7 @@ class ApprovalGateTest {
     @Test
     @TestTransaction
     void respondToApprovalSetsCorrelationId() {
-        tools.createChannel("ag-respond-3", "Approvals", null, null);
+        tools.createChannel("ag-respond-3", "Approvals", null, null, null, null, null, null, null);
         String corrId = UUID.randomUUID().toString();
 
         QhorusMcpTools.MessageResult result = tools.respondToApproval(corrId, "yes", "ag-respond-3");
@@ -108,7 +108,7 @@ class ApprovalGateTest {
     @Test
     @TestTransaction
     void listPendingCommitmentsShowsRegisteredApproval() {
-        tools.createChannel("ag-list-1", "Approvals", null, null);
+        tools.createChannel("ag-list-1", "Approvals", null, null, null, null, null, null, null);
         String corrId = UUID.randomUUID().toString();
 
         // Register directly via CommitmentService — simulates what wait_for_reply does
@@ -124,7 +124,7 @@ class ApprovalGateTest {
     @Test
     @TestTransaction
     void listPendingCommitmentsResolvesChannelId() {
-        tools.createChannel("ag-list-2", "Approvals", null, null);
+        tools.createChannel("ag-list-2", "Approvals", null, null, null, null, null, null, null);
         String corrId = UUID.randomUUID().toString();
 
         var ch = channelService.findByName("ag-list-2").orElseThrow();
@@ -143,7 +143,7 @@ class ApprovalGateTest {
     @Test
     @TestTransaction
     void listPendingCommitmentsShowsExpiresAt() {
-        tools.createChannel("ag-list-3", "Approvals", null, null);
+        tools.createChannel("ag-list-3", "Approvals", null, null, null, null, null, null, null);
         String corrId = UUID.randomUUID().toString();
 
         var ch = channelService.findByName("ag-list-3").orElseThrow();
@@ -162,7 +162,7 @@ class ApprovalGateTest {
     @Test
     @TestTransaction
     void listPendingCommitmentsOrdersByExpiresAtAscending() {
-        tools.createChannel("ag-list-4", "Approvals", null, null);
+        tools.createChannel("ag-list-4", "Approvals", null, null, null, null, null, null, null);
         String corrId1 = UUID.randomUUID().toString();
         String corrId2 = UUID.randomUUID().toString();
 
@@ -188,15 +188,14 @@ class ApprovalGateTest {
 
     @Test
     void requestApprovalFindsPreSeededResponse() {
-        tools.createChannel("ag-req-1", "Approvals", null, null);
+        tools.createChannel("ag-req-1", "Approvals", null, null, null, null, null, null, null);
         String corrId = UUID.randomUUID().toString();
 
         // Pre-seed the human's response before requesting approval
-        tools.sendMessage("ag-req-1", "human", "response", "approved by human",
-                corrId, null, null, null);
+        tools.sendMessage("ag-req-1", "human", "response", "approved by human", corrId, null, null, null, null);
 
         // request_approval finds the response on the first poll — returns immediately
-        QhorusMcpTools.WaitResult result = tools.requestApproval("ag-req-1", "please approve this", corrId, 5);
+        QhorusMcpTools.WaitResult result = tools.requestApprovalWithCorrelationId("ag-req-1", "please approve this", corrId, 5);
 
         assertTrue(result.found(), "should find the pre-seeded response immediately");
         assertFalse(result.timedOut());
@@ -206,15 +205,15 @@ class ApprovalGateTest {
 
     @Test
     void requestApprovalCreatesRequestMessageInChannel() {
-        tools.createChannel("ag-req-2", "Approvals", null, null);
+        tools.createChannel("ag-req-2", "Approvals", null, null, null, null, null, null, null);
         String corrId = UUID.randomUUID().toString();
 
         // Pre-seed response so request_approval doesn't block long
-        tools.sendMessage("ag-req-2", "human", "response", "ok", corrId, null, null, null);
-        tools.requestApproval("ag-req-2", "needs approval", corrId, 5);
+        tools.sendMessage("ag-req-2", "human", "response", "ok", corrId, null, null, null, null);
+        tools.requestApprovalWithCorrelationId("ag-req-2", "needs approval", corrId, 5);
 
         // Channel should contain both the request (from requestApproval) and the response
-        QhorusMcpTools.CheckResult check = tools.checkMessages("ag-req-2", 0L, 10, null);
+        QhorusMcpTools.CheckResult check = tools.checkMessages("ag-req-2", 0L, 10, null, null, null);
         assertTrue(check.messages().stream().anyMatch(m -> "QUERY".equals(m.messageType())),
                 "request_approval should post a query message to the channel");
         assertTrue(check.messages().stream().anyMatch(m -> "RESPONSE".equals(m.messageType())));
@@ -222,22 +221,22 @@ class ApprovalGateTest {
 
     @Test
     void requestApprovalUsesProvidedCorrelationId() {
-        tools.createChannel("ag-req-3", "Approvals", null, null);
+        tools.createChannel("ag-req-3", "Approvals", null, null, null, null, null, null, null);
         String corrId = UUID.randomUUID().toString();
 
-        tools.sendMessage("ag-req-3", "human", "response", "ok", corrId, null, null, null);
-        QhorusMcpTools.WaitResult result = tools.requestApproval("ag-req-3", "approve", corrId, 5);
+        tools.sendMessage("ag-req-3", "human", "response", "ok", corrId, null, null, null, null);
+        QhorusMcpTools.WaitResult result = tools.requestApprovalWithCorrelationId("ag-req-3", "approve", corrId, 5);
 
         assertEquals(corrId, result.correlationId());
     }
 
     @Test
     void requestApprovalTimesOutGracefully() {
-        tools.createChannel("ag-req-4", "Approvals", null, null);
+        tools.createChannel("ag-req-4", "Approvals", null, null, null, null, null, null, null);
         String corrId = UUID.randomUUID().toString();
 
         // No response seeded — should time out after 1s
-        QhorusMcpTools.WaitResult result = tools.requestApproval("ag-req-4", "needs approval", corrId, 1);
+        QhorusMcpTools.WaitResult result = tools.requestApprovalWithCorrelationId("ag-req-4", "needs approval", corrId, 1);
 
         assertFalse(result.found());
         assertTrue(result.timedOut(), "should time out when no response arrives");
@@ -249,7 +248,7 @@ class ApprovalGateTest {
 
     @Test
     void e2eAgentRequestsHumanApproves() {
-        tools.createChannel("ag-e2e-1", "Human Approvals", null, null);
+        tools.createChannel("ag-e2e-1", "Human Approvals", null, null, null, null, null, null, null);
         String corrId = UUID.randomUUID().toString();
 
         // 1. Simulate the pending state by opening a commitment directly —
@@ -267,7 +266,7 @@ class ApprovalGateTest {
         tools.respondToApproval(corrId, "Approved — proceed with deployment", "ag-e2e-1");
 
         // 4. Verify the response message exists in the channel with correct fields
-        QhorusMcpTools.CheckResult check = tools.checkMessages("ag-e2e-1", 0L, 10, null);
+        QhorusMcpTools.CheckResult check = tools.checkMessages("ag-e2e-1", 0L, 10, null, null, null);
         QhorusMcpTools.MessageSummary response = check.messages().stream()
                 .filter(m -> "RESPONSE".equals(m.messageType()))
                 .findFirst()
@@ -279,15 +278,14 @@ class ApprovalGateTest {
 
     @Test
     void e2eRequestApprovalThenRespondReturnsToCaller() {
-        tools.createChannel("ag-e2e-2", "Approvals", null, null);
+        tools.createChannel("ag-e2e-2", "Approvals", null, null, null, null, null, null, null);
         String corrId = UUID.randomUUID().toString();
 
         // 1. Pre-seed the human's response
-        tools.sendMessage("ag-e2e-2", "human", "response", "Yes, deploy it!",
-                corrId, null, null, null);
+        tools.sendMessage("ag-e2e-2", "human", "response", "Yes, deploy it!", corrId, null, null, null, null);
 
         // 2. Agent calls request_approval — finds response immediately
-        QhorusMcpTools.WaitResult agentResult = tools.requestApproval("ag-e2e-2", "Deploy to production?", corrId, 5);
+        QhorusMcpTools.WaitResult agentResult = tools.requestApprovalWithCorrelationId("ag-e2e-2", "Deploy to production?", corrId, 5);
 
         // 3. Agent verifies the approval
         assertTrue(agentResult.found());
@@ -297,7 +295,7 @@ class ApprovalGateTest {
 
     @Test
     void e2eMultiplePendingCommitmentsDiscoveredAndAnswered() {
-        tools.createChannel("ag-e2e-3", "Approvals", null, null);
+        tools.createChannel("ag-e2e-3", "Approvals", null, null, null, null, null, null, null);
         String corrId1 = UUID.randomUUID().toString();
         String corrId2 = UUID.randomUUID().toString();
 
@@ -319,7 +317,7 @@ class ApprovalGateTest {
         tools.respondToApproval(corrId2, "Approved #2", "ag-e2e-3");
 
         // Both responses exist in the channel
-        QhorusMcpTools.CheckResult check = tools.checkMessages("ag-e2e-3", 0L, 10, null);
+        QhorusMcpTools.CheckResult check = tools.checkMessages("ag-e2e-3", 0L, 10, null, null, null);
         assertEquals(2, check.messages().stream()
                 .filter(m -> "RESPONSE".equals(m.messageType())).count());
     }

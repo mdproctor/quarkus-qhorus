@@ -21,12 +21,12 @@ class CollectSemanticTest {
     @Test
     @TestTransaction
     void collectDeliversAllContributionsAtomically() {
-        tools.createChannel("col-1", "COLLECT channel", "COLLECT", null);
-        tools.sendMessage("col-1", "alice", "status", "alice's finding", null, null);
-        tools.sendMessage("col-1", "bob", "status", "bob's finding", null, null);
-        tools.sendMessage("col-1", "carol", "status", "carol's finding", null, null);
+        tools.createChannel("col-1", "COLLECT channel", "COLLECT", null, null, null, null, null, null);
+        tools.sendMessage("col-1", "alice", "status", "alice's finding", null, null, null, null, null);
+        tools.sendMessage("col-1", "bob", "status", "bob's finding", null, null, null, null, null);
+        tools.sendMessage("col-1", "carol", "status", "carol's finding", null, null, null, null, null);
 
-        CheckResult result = tools.checkMessages("col-1", 0L, 10, null);
+        CheckResult result = tools.checkMessages("col-1", 0L, 10, null, null, null);
 
         assertEquals(3, result.messages().size(),
                 "COLLECT should deliver all accumulated messages");
@@ -35,11 +35,11 @@ class CollectSemanticTest {
     @Test
     @TestTransaction
     void collectClearsChannelAfterDelivery() {
-        tools.createChannel("col-2", "COLLECT channel", "COLLECT", null);
-        tools.sendMessage("col-2", "alice", "status", "contribution", null, null);
-        tools.checkMessages("col-2", 0L, 10, null); // Deliver and clear
+        tools.createChannel("col-2", "COLLECT channel", "COLLECT", null, null, null, null, null, null);
+        tools.sendMessage("col-2", "alice", "status", "contribution", null, null, null, null, null);
+        tools.checkMessages("col-2", 0L, 10, null, null, null); // Deliver and clear
 
-        CheckResult second = tools.checkMessages("col-2", 0L, 10, null);
+        CheckResult second = tools.checkMessages("col-2", 0L, 10, null, null, null);
         assertTrue(second.messages().isEmpty(),
                 "COLLECT channel should be empty after delivery");
     }
@@ -47,12 +47,12 @@ class CollectSemanticTest {
     @Test
     @TestTransaction
     void collectIgnoresAfterIdCursorDeliversAll() {
-        tools.createChannel("col-3", "COLLECT channel", "COLLECT", null);
-        MessageResult m1 = tools.sendMessage("col-3", "alice", "status", "first", null, null);
-        tools.sendMessage("col-3", "bob", "status", "second", null, null);
+        tools.createChannel("col-3", "COLLECT channel", "COLLECT", null, null, null, null, null, null);
+        MessageResult m1 = tools.sendMessage("col-3", "alice", "status", "first", null, null, null, null, null);
+        tools.sendMessage("col-3", "bob", "status", "second", null, null, null, null, null);
 
         // Even with afterId past the first message, COLLECT delivers everything pending
-        CheckResult result = tools.checkMessages("col-3", m1.messageId(), 10, null);
+        CheckResult result = tools.checkMessages("col-3", m1.messageId(), 10, null, null, null);
 
         assertEquals(2, result.messages().size(),
                 "COLLECT should deliver all messages regardless of afterId cursor");
@@ -61,13 +61,13 @@ class CollectSemanticTest {
     @Test
     @TestTransaction
     void collectNewCycleAfterClear() {
-        tools.createChannel("col-4", "COLLECT channel", "COLLECT", null);
-        tools.sendMessage("col-4", "alice", "status", "cycle-1 data", null, null);
-        tools.checkMessages("col-4", 0L, 10, null); // Clear cycle 1
+        tools.createChannel("col-4", "COLLECT channel", "COLLECT", null, null, null, null, null, null);
+        tools.sendMessage("col-4", "alice", "status", "cycle-1 data", null, null, null, null, null);
+        tools.checkMessages("col-4", 0L, 10, null, null, null); // Clear cycle 1
 
         // New writes start cycle 2
-        tools.sendMessage("col-4", "bob", "status", "cycle-2 data", null, null);
-        CheckResult result = tools.checkMessages("col-4", 0L, 10, null);
+        tools.sendMessage("col-4", "bob", "status", "cycle-2 data", null, null, null, null, null);
+        CheckResult result = tools.checkMessages("col-4", 0L, 10, null, null, null);
 
         assertEquals(1, result.messages().size());
         assertEquals("cycle-2 data", result.messages().get(0).content());
@@ -76,12 +76,12 @@ class CollectSemanticTest {
     @Test
     @TestTransaction
     void collectExcludesEventMessages() {
-        tools.createChannel("col-5", "COLLECT channel", "COLLECT", null);
-        tools.sendMessage("col-5", "alice", "status", "visible", null, null);
-        tools.sendMessage("col-5", "system", "event", "telemetry", null, null);
-        tools.sendMessage("col-5", "bob", "status", "also visible", null, null);
+        tools.createChannel("col-5", "COLLECT channel", "COLLECT", null, null, null, null, null, null);
+        tools.sendMessage("col-5", "alice", "status", "visible", null, null, null, null, null);
+        tools.sendMessage("col-5", "system", "event", "telemetry", null, null, null, null, null);
+        tools.sendMessage("col-5", "bob", "status", "also visible", null, null, null, null, null);
 
-        CheckResult result = tools.checkMessages("col-5", 0L, 10, null);
+        CheckResult result = tools.checkMessages("col-5", 0L, 10, null, null, null);
 
         assertEquals(2, result.messages().size(),
                 "COLLECT should exclude EVENT messages from delivery");
@@ -91,11 +91,11 @@ class CollectSemanticTest {
     @Test
     @TestTransaction
     void appendChannelUnaffectedByCollectLogic() {
-        tools.createChannel("append-col", "APPEND channel", "APPEND", null);
-        tools.sendMessage("append-col", "alice", "status", "persistent", null, null);
-        tools.checkMessages("append-col", 0L, 10, null);
+        tools.createChannel("append-col", "APPEND channel", "APPEND", null, null, null, null, null, null);
+        tools.sendMessage("append-col", "alice", "status", "persistent", null, null, null, null, null);
+        tools.checkMessages("append-col", 0L, 10, null, null, null);
 
-        CheckResult second = tools.checkMessages("append-col", 0L, 10, null);
+        CheckResult second = tools.checkMessages("append-col", 0L, 10, null, null, null);
         assertEquals(1, second.messages().size(),
                 "APPEND channel messages should not be cleared on read");
     }

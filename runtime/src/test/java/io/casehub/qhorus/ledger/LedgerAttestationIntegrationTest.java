@@ -47,10 +47,10 @@ class LedgerAttestationIntegrationTest {
         setup(channelName, "agent-a", "agent-b");
 
         // COMMAND — creates the ledger entry the attestation will be written on
-        tools.sendMessage(channelName, "agent-a", "command", "Run audit", corrId, null, null, null);
+        tools.sendMessage(channelName, "agent-a", "command", "Run audit", corrId, null, null, null, null);
 
         // DONE — triggers SOUND attestation on the COMMAND's ledger entry
-        tools.sendMessage(channelName, "agent-b", "done", "Audit complete", corrId, null, null, null);
+        tools.sendMessage(channelName, "agent-b", "done", "Audit complete", corrId, null, null, null, null);
 
         UUID channelId = channelId(channelName);
         List<MessageLedgerEntry> entries = ledgerRepo.findAllByCorrelationId(channelId, corrId);
@@ -75,8 +75,8 @@ class LedgerAttestationIntegrationTest {
         String corrId = UUID.randomUUID().toString();
         setup(channelName, "agent-a", "agent-b");
 
-        tools.sendMessage(channelName, "agent-a", "command", "Run analysis", corrId, null, null, null);
-        tools.sendMessage(channelName, "agent-b", "failure", "Could not access data", corrId, null, null, null);
+        tools.sendMessage(channelName, "agent-a", "command", "Run analysis", corrId, null, null, null, null);
+        tools.sendMessage(channelName, "agent-b", "failure", "Could not access data", corrId, null, null, null, null);
 
         UUID channelId = channelId(channelName);
         MessageLedgerEntry commandEntry = ledgerRepo.findAllByCorrelationId(channelId, corrId).stream()
@@ -94,8 +94,8 @@ class LedgerAttestationIntegrationTest {
         String corrId = UUID.randomUUID().toString();
         setup(channelName, "agent-a", "agent-b");
 
-        tools.sendMessage(channelName, "agent-a", "command", "Do something", corrId, null, null, null);
-        tools.sendMessage(channelName, "agent-b", "decline", "Outside my scope", corrId, null, null, null);
+        tools.sendMessage(channelName, "agent-a", "command", "Do something", corrId, null, null, null, null);
+        tools.sendMessage(channelName, "agent-b", "decline", "Outside my scope", corrId, null, null, null, null);
 
         UUID channelId = channelId(channelName);
         MessageLedgerEntry commandEntry = ledgerRepo.findAllByCorrelationId(channelId, corrId).stream()
@@ -112,8 +112,8 @@ class LedgerAttestationIntegrationTest {
         String corrId = UUID.randomUUID().toString();
         setup(channelName, "agent-a");
 
-        tools.sendMessage(channelName, "agent-a", "command", "Long task", corrId, null, null, null);
-        tools.sendMessage(channelName, "agent-a", "status", "Still working", corrId, null, null, null);
+        tools.sendMessage(channelName, "agent-a", "command", "Long task", corrId, null, null, null, null);
+        tools.sendMessage(channelName, "agent-a", "status", "Still working", corrId, null, null, null, null);
 
         UUID channelId = channelId(channelName);
         MessageLedgerEntry commandEntry = ledgerRepo.findAllByCorrelationId(channelId, corrId).stream()
@@ -129,7 +129,7 @@ class LedgerAttestationIntegrationTest {
         setup(channelName, "agent-b");
 
         // DONE with no matching COMMAND — must not throw, no attestation
-        assertDoesNotThrow(() -> tools.sendMessage(channelName, "agent-b", "done", "Orphan done", corrId, null, null, null));
+        assertDoesNotThrow(() -> tools.sendMessage(channelName, "agent-b", "done", "Orphan done", corrId, null, null, null, null));
 
         UUID channelId = channelId(channelName);
         MessageLedgerEntry doneEntry = ledgerRepo.findAllByCorrelationId(channelId, corrId).stream()
@@ -141,7 +141,7 @@ class LedgerAttestationIntegrationTest {
     void actorId_is_resolved_via_default_provider_identity() {
         String channelName = "attest-actorid-" + System.nanoTime();
         setup(channelName, "agent-xyz");
-        tools.sendMessage(channelName, "agent-xyz", "status", "hello", null, null, null, null);
+        tools.sendMessage(channelName, "agent-xyz", "status", "hello", null, null, null, null, null);
 
         UUID channelId = channelId(channelName);
         List<MessageLedgerEntry> entries = ledgerRepo.findByActorIdInChannel(channelId, "agent-xyz", 10);
@@ -152,7 +152,7 @@ class LedgerAttestationIntegrationTest {
     // ── helpers ──────────────────────────────────────────────────────────────
 
     private void setup(final String channel, final String... agents) {
-        tools.createChannel(channel, "Attestation test channel", "APPEND", null);
+        tools.createChannel(channel, "Attestation test channel", "APPEND", null, null, null, null, null, null);
         for (final String agent : agents) {
             tools.registerInstance(channel, agent, null, null, null);
         }

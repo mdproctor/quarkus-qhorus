@@ -33,8 +33,7 @@ class InstanceToolTest {
     void registerCreatesInstanceAndReturnsContextSnapshot() {
         channelService.create("welcome-ch", "General channel", ChannelSemantic.APPEND, null);
 
-        QhorusMcpTools.RegisterResponse resp = tools.register(
-                "test-agent", "A test agent", List.of("code-review", "java"), null);
+        QhorusMcpTools.RegisterResponse resp = tools.register("test-agent", "A test agent", List.of("code-review", "java"), null, null);
 
         assertEquals("test-agent", resp.instanceId());
         assertTrue(resp.activeChannels().stream().anyMatch(c -> "welcome-ch".equals(c.name())),
@@ -46,9 +45,8 @@ class InstanceToolTest {
     @Test
     @TestTransaction
     void registerUpsertsSameInstanceIdWithoutDuplicate() {
-        tools.register("upsert-agent", "First", List.of("python"), null);
-        QhorusMcpTools.RegisterResponse second = tools.register(
-                "upsert-agent", "Updated description", List.of("ml"), null);
+        tools.register("upsert-agent", "First", List.of("python"), null, null);
+        QhorusMcpTools.RegisterResponse second = tools.register("upsert-agent", "Updated description", List.of("ml"), null, null);
 
         assertEquals("upsert-agent", second.instanceId());
         long count = second.onlineInstances().stream()
@@ -59,10 +57,10 @@ class InstanceToolTest {
     @Test
     @TestTransaction
     void registerReplacesCapabilityTagsOnUpsert() {
-        tools.register("cap-upsert-agent", "Agent", List.of("python"), null);
+        tools.register("cap-upsert-agent", "Agent", List.of("python"), null, null);
 
         // Re-register with different tags
-        tools.register("cap-upsert-agent", "Agent", List.of("ml"), null);
+        tools.register("cap-upsert-agent", "Agent", List.of("ml"), null, null);
 
         // Old tag must be gone, new tag must be present
         assertTrue(instanceService.findByCapability("python").isEmpty(),
@@ -74,7 +72,7 @@ class InstanceToolTest {
     @Test
     @TestTransaction
     void registerStoresClaudonySessionId() {
-        tools.register("claudony-agent", "Claudony-managed", List.of(), "claudony-session-xyz");
+        tools.register("claudony-agent", "Claudony-managed", List.of(), "claudony-session-xyz", null);
 
         // Verify the claudonySessionId was actually persisted to the entity
         Instance inst = instanceService.findByInstanceId("claudony-agent").orElseThrow();
@@ -85,7 +83,7 @@ class InstanceToolTest {
     @Test
     @TestTransaction
     void registerWithNoClaudonySessionIdLeavesFieldNull() {
-        tools.register("plain-agent", "No claudony", List.of(), null);
+        tools.register("plain-agent", "No claudony", List.of(), null, null);
 
         Instance inst = instanceService.findByInstanceId("plain-agent").orElseThrow();
         assertNull(inst.claudonySessionId,
@@ -95,8 +93,8 @@ class InstanceToolTest {
     @Test
     @TestTransaction
     void listInstancesReturnsAllOnline() {
-        tools.register("l-agent-1", "Agent 1", List.of("skill-a"), null);
-        tools.register("l-agent-2", "Agent 2", List.of("skill-b"), null);
+        tools.register("l-agent-1", "Agent 1", List.of("skill-a"), null, null);
+        tools.register("l-agent-2", "Agent 2", List.of("skill-b"), null, null);
 
         List<QhorusMcpTools.InstanceInfo> all = tools.listInstances(null);
 
@@ -107,8 +105,8 @@ class InstanceToolTest {
     @Test
     @TestTransaction
     void listInstancesFiltersByCapabilityTag() {
-        tools.register("py-agent", "Python expert", List.of("python"), null);
-        tools.register("jv-agent", "Java expert", List.of("java"), null);
+        tools.register("py-agent", "Python expert", List.of("python"), null, null);
+        tools.register("jv-agent", "Java expert", List.of("java"), null, null);
 
         List<QhorusMcpTools.InstanceInfo> pythonOnly = tools.listInstances("python");
 
@@ -119,7 +117,7 @@ class InstanceToolTest {
     @Test
     @TestTransaction
     void listInstancesIncludesCapabilitiesOnEachEntry() {
-        tools.register("multi-agent", "Multi-skill", List.of("code-review", "testing"), null);
+        tools.register("multi-agent", "Multi-skill", List.of("code-review", "testing"), null, null);
 
         List<QhorusMcpTools.InstanceInfo> all = tools.listInstances(null);
         QhorusMcpTools.InstanceInfo agent = all.stream()
@@ -133,7 +131,7 @@ class InstanceToolTest {
     @Test
     @TestTransaction
     void listInstancesWithNoMatchingCapabilityReturnsEmpty() {
-        tools.register("solo-agent", "Solo", List.of("python"), null);
+        tools.register("solo-agent", "Solo", List.of("python"), null, null);
 
         List<QhorusMcpTools.InstanceInfo> result = tools.listInstances("no-such-cap");
 

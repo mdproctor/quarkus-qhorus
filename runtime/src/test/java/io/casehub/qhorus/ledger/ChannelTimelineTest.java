@@ -36,16 +36,14 @@ class ChannelTimelineTest {
     QhorusMcpTools tools;
 
     private void setup(final String channel, final String... agents) {
-        tools.createChannel(channel, "LAST_WRITE", null, null);
+        tools.createChannel(channel, "LAST_WRITE", null, null, null, null, null, null, null);
         for (final String agent : agents) {
             tools.registerInstance(channel, agent, null, null, null);
         }
     }
 
     private void sendEvent(final String channel, final String sender, final String tool) {
-        tools.sendMessage(channel, sender, "event",
-                String.format("{\"tool_name\":\"%s\",\"duration_ms\":10}", tool),
-                null, null);
+        tools.sendMessage(channel, sender, "event", String.format("{\"tool_name\":\"%s\",\"duration_ms\":10}", tool), null, null, null, null, null);
     }
 
     // =========================================================================
@@ -56,8 +54,8 @@ class ChannelTimelineTest {
     void timeline_mixedTypes_returnedInOrder() {
         setup("ct-mixed-1", "agent-1");
 
-        tools.sendMessage("ct-mixed-1", "agent-1", "command", "Do X", null, null);
-        tools.sendMessage("ct-mixed-1", "agent-1", "status", "Working", null, null);
+        tools.sendMessage("ct-mixed-1", "agent-1", "command", "Do X", null, null, null, null, null);
+        tools.sendMessage("ct-mixed-1", "agent-1", "status", "Working", null, null, null, null, null);
         sendEvent("ct-mixed-1", "agent-1", "read_file");
 
         final List<Map<String, Object>> timeline = tools.getChannelTimeline("ct-mixed-1", null, 50);
@@ -69,7 +67,7 @@ class ChannelTimelineTest {
     void timeline_entriesHaveType() {
         setup("ct-type-1", "agent-1");
 
-        tools.sendMessage("ct-type-1", "agent-1", "command", "Go", null, null);
+        tools.sendMessage("ct-type-1", "agent-1", "command", "Go", null, null, null, null, null);
         sendEvent("ct-type-1", "agent-1", "analyze");
 
         final List<Map<String, Object>> timeline = tools.getChannelTimeline("ct-type-1", null, 50);
@@ -84,7 +82,7 @@ class ChannelTimelineTest {
     void timeline_regularMessages_haveMessageType() {
         setup("ct-msgtype-1", "agent-1");
 
-        tools.sendMessage("ct-msgtype-1", "agent-1", "command", "Do something", null, null);
+        tools.sendMessage("ct-msgtype-1", "agent-1", "command", "Do something", null, null, null, null, null);
 
         final List<Map<String, Object>> timeline = tools.getChannelTimeline("ct-msgtype-1", null, 50);
 
@@ -118,9 +116,9 @@ class ChannelTimelineTest {
     void timeline_chronologicalOrder() {
         setup("ct-order-1", "agent-1");
 
-        tools.sendMessage("ct-order-1", "agent-1", "command", "step 1", null, null);
+        tools.sendMessage("ct-order-1", "agent-1", "command", "step 1", null, null, null, null, null);
         sendEvent("ct-order-1", "agent-1", "analyze");
-        tools.sendMessage("ct-order-1", "agent-1", "status", "done", null, null);
+        tools.sendMessage("ct-order-1", "agent-1", "status", "done", null, null, null, null, null);
 
         final List<Map<String, Object>> timeline = tools.getChannelTimeline("ct-order-1", null, 50);
 
@@ -140,8 +138,7 @@ class ChannelTimelineTest {
         setup("ct-limit-1", "agent-1");
 
         for (int i = 0; i < 5; i++) {
-            tools.sendMessage("ct-limit-1", "agent-1", "status", "step " + i,
-                    null, null);
+            tools.sendMessage("ct-limit-1", "agent-1", "status", "step " + i, null, null, null, null, null);
         }
 
         final List<Map<String, Object>> page = tools.getChannelTimeline("ct-limit-1", null, 3);
@@ -153,9 +150,9 @@ class ChannelTimelineTest {
     void timeline_afterId_returnsNextPage() {
         setup("ct-cursor-1", "agent-1");
 
-        tools.sendMessage("ct-cursor-1", "agent-1", "command", "first", null, null);
-        tools.sendMessage("ct-cursor-1", "agent-1", "status", "second", null, null);
-        tools.sendMessage("ct-cursor-1", "agent-1", "status", "third", null, null);
+        tools.sendMessage("ct-cursor-1", "agent-1", "command", "first", null, null, null, null, null);
+        tools.sendMessage("ct-cursor-1", "agent-1", "status", "second", null, null, null, null, null);
+        tools.sendMessage("ct-cursor-1", "agent-1", "status", "third", null, null, null, null, null);
 
         final List<Map<String, Object>> page1 = tools.getChannelTimeline("ct-cursor-1", null, 2);
         assertEquals(2, page1.size());

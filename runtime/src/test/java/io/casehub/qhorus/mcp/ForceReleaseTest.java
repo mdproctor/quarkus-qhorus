@@ -37,11 +37,11 @@ class ForceReleaseTest {
     @Test
     @TestTransaction
     void forceReleaseBarrierDeliversMessagesBeforeAllContributorsWrite() {
-        tools.createChannel("fr-barrier-1", "Test", "BARRIER", "alice,bob");
+        tools.createChannel("fr-barrier-1", "Test", "BARRIER", "alice,bob", null, null, null, null, null);
         // Only alice writes — barrier is stuck
-        tools.sendMessage("fr-barrier-1", "alice", "response", "alice done", null, null, null, null);
+        tools.sendMessage("fr-barrier-1", "alice", "response", "alice done", null, null, null, null, null);
 
-        QhorusMcpTools.ForceReleaseResult result = tools.forceReleaseChannel("fr-barrier-1", null);
+        QhorusMcpTools.ForceReleaseResult result = tools.forceReleaseChannel("fr-barrier-1", null, null);
 
         assertNotNull(result);
         assertEquals("fr-barrier-1", result.channelName());
@@ -54,10 +54,10 @@ class ForceReleaseTest {
     @Test
     @TestTransaction
     void forceReleaseBarrierPostsAuditEvent() {
-        tools.createChannel("fr-barrier-2", "Test", "BARRIER", "alice,bob");
-        tools.sendMessage("fr-barrier-2", "alice", "response", "partial", null, null, null, null);
+        tools.createChannel("fr-barrier-2", "Test", "BARRIER", "alice,bob", null, null, null, null, null);
+        tools.sendMessage("fr-barrier-2", "alice", "response", "partial", null, null, null, null, null);
 
-        tools.forceReleaseChannel("fr-barrier-2", "admin override");
+        tools.forceReleaseChannel("fr-barrier-2", "admin override", null);
 
         // After force-release, the channel should have an event message recording the action
         // BARRIER clears non-event messages — event messages survive
@@ -67,18 +67,17 @@ class ForceReleaseTest {
         // We verify by checking that force_release returned successfully with the reason recorded
         // (Full audit verification would require a separate event-query tool added in Phase 12)
         // For now: verify the result includes the reason
-        QhorusMcpTools.ForceReleaseResult result = tools.forceReleaseChannel("fr-barrier-2",
-                "second release — channel already clear");
+        QhorusMcpTools.ForceReleaseResult result = tools.forceReleaseChannel("fr-barrier-2", "second release — channel already clear", null);
         assertEquals(0, result.messageCount(), "channel should be empty after first force-release");
     }
 
     @Test
     @TestTransaction
     void forceReleaseEmptyBarrierReturnsZeroMessages() {
-        tools.createChannel("fr-barrier-3", "Test", "BARRIER", "alice,bob");
+        tools.createChannel("fr-barrier-3", "Test", "BARRIER", "alice,bob", null, null, null, null, null);
         // No messages written
 
-        QhorusMcpTools.ForceReleaseResult result = tools.forceReleaseChannel("fr-barrier-3", null);
+        QhorusMcpTools.ForceReleaseResult result = tools.forceReleaseChannel("fr-barrier-3", null, null);
 
         assertEquals(0, result.messageCount(), "empty channel force-release should return 0 messages");
         assertTrue(result.messages().isEmpty());
@@ -87,14 +86,14 @@ class ForceReleaseTest {
     @Test
     @TestTransaction
     void forceReleaseBarrierClearsChannelSoSubsequentCheckMessagesIsEmpty() {
-        tools.createChannel("fr-barrier-4", "Test", "BARRIER", "alice,bob");
-        tools.sendMessage("fr-barrier-4", "alice", "response", "alice work", null, null, null, null);
+        tools.createChannel("fr-barrier-4", "Test", "BARRIER", "alice,bob", null, null, null, null, null);
+        tools.sendMessage("fr-barrier-4", "alice", "response", "alice work", null, null, null, null, null);
 
-        tools.forceReleaseChannel("fr-barrier-4", null);
+        tools.forceReleaseChannel("fr-barrier-4", null, null);
 
         // After force-release, channel is cleared and BARRIER is reset to its initial waiting state.
         // The BARRIER semantic always reports "waiting" when the channel is empty (fresh cycle).
-        QhorusMcpTools.CheckResult check = tools.checkMessages("fr-barrier-4", 0L, 10, null);
+        QhorusMcpTools.CheckResult check = tools.checkMessages("fr-barrier-4", 0L, 10, null, null, null);
         assertTrue(check.messages().isEmpty(),
                 "channel should be empty after force-release — messages were delivered and cleared");
         assertNotNull(check.barrierStatus(),
@@ -108,11 +107,11 @@ class ForceReleaseTest {
     @Test
     @TestTransaction
     void forceReleaseCollectDeliversAccumulatedMessages() {
-        tools.createChannel("fr-collect-1", "Test", "COLLECT", null);
-        tools.sendMessage("fr-collect-1", "alice", "response", "alice result", null, null, null, null);
-        tools.sendMessage("fr-collect-1", "bob", "response", "bob result", null, null, null, null);
+        tools.createChannel("fr-collect-1", "Test", "COLLECT", null, null, null, null, null, null);
+        tools.sendMessage("fr-collect-1", "alice", "response", "alice result", null, null, null, null, null);
+        tools.sendMessage("fr-collect-1", "bob", "response", "bob result", null, null, null, null, null);
 
-        QhorusMcpTools.ForceReleaseResult result = tools.forceReleaseChannel("fr-collect-1", null);
+        QhorusMcpTools.ForceReleaseResult result = tools.forceReleaseChannel("fr-collect-1", null, null);
 
         assertEquals(2, result.messageCount());
         assertEquals(2, result.messages().size());
@@ -121,12 +120,12 @@ class ForceReleaseTest {
     @Test
     @TestTransaction
     void forceReleaseCollectClearsChannelAfterDelivery() {
-        tools.createChannel("fr-collect-2", "Test", "COLLECT", null);
-        tools.sendMessage("fr-collect-2", "alice", "status", "msg", null, null, null, null);
+        tools.createChannel("fr-collect-2", "Test", "COLLECT", null, null, null, null, null, null);
+        tools.sendMessage("fr-collect-2", "alice", "status", "msg", null, null, null, null, null);
 
-        tools.forceReleaseChannel("fr-collect-2", null);
+        tools.forceReleaseChannel("fr-collect-2", null, null);
 
-        QhorusMcpTools.CheckResult check = tools.checkMessages("fr-collect-2", 0L, 10, null);
+        QhorusMcpTools.CheckResult check = tools.checkMessages("fr-collect-2", 0L, 10, null, null, null);
         assertTrue(check.messages().isEmpty(),
                 "COLLECT channel should be empty after force-release");
     }
@@ -138,36 +137,36 @@ class ForceReleaseTest {
     @Test
     @TestTransaction
     void forceReleaseAppendChannelThrows() {
-        tools.createChannel("fr-append-1", "Test", "APPEND", null);
+        tools.createChannel("fr-append-1", "Test", "APPEND", null, null, null, null, null, null);
 
         assertThrows(ToolCallException.class,
-                () -> tools.forceReleaseChannel("fr-append-1", null),
+                () -> tools.forceReleaseChannel("fr-append-1", null, null),
                 "force_release_channel should reject APPEND channels");
     }
 
     @Test
     @TestTransaction
     void forceReleaseEphemeralChannelThrows() {
-        tools.createChannel("fr-ephemeral-1", "Test", "EPHEMERAL", null);
+        tools.createChannel("fr-ephemeral-1", "Test", "EPHEMERAL", null, null, null, null, null, null);
 
         assertThrows(ToolCallException.class,
-                () -> tools.forceReleaseChannel("fr-ephemeral-1", null));
+                () -> tools.forceReleaseChannel("fr-ephemeral-1", null, null));
     }
 
     @Test
     @TestTransaction
     void forceReleaseLastWriteChannelThrows() {
-        tools.createChannel("fr-lw-1", "Test", "LAST_WRITE", null);
+        tools.createChannel("fr-lw-1", "Test", "LAST_WRITE", null, null, null, null, null, null);
 
         assertThrows(ToolCallException.class,
-                () -> tools.forceReleaseChannel("fr-lw-1", null));
+                () -> tools.forceReleaseChannel("fr-lw-1", null, null));
     }
 
     @Test
     @TestTransaction
     void forceReleaseUnknownChannelThrows() {
         assertThrows(ToolCallException.class,
-                () -> tools.forceReleaseChannel("no-such-channel", null));
+                () -> tools.forceReleaseChannel("no-such-channel", null, null));
     }
 
     // -------------------------------------------------------------------------
@@ -177,27 +176,27 @@ class ForceReleaseTest {
     @Test
     @TestTransaction
     void integrationBarrierStuckThenForceReleased() {
-        tools.createChannel("fr-int-1", "Test", "BARRIER", "alice,bob,carol");
+        tools.createChannel("fr-int-1", "Test", "BARRIER", "alice,bob,carol", null, null, null, null, null);
 
         // Only alice and bob write
-        tools.sendMessage("fr-int-1", "alice", "response", "alice done", null, null, null, null);
-        tools.sendMessage("fr-int-1", "bob", "response", "bob done", null, null, null, null);
+        tools.sendMessage("fr-int-1", "alice", "response", "alice done", null, null, null, null, null);
+        tools.sendMessage("fr-int-1", "bob", "response", "bob done", null, null, null, null, null);
 
         // BARRIER is stuck waiting for carol
-        QhorusMcpTools.CheckResult stuck = tools.checkMessages("fr-int-1", 0L, 10, null);
+        QhorusMcpTools.CheckResult stuck = tools.checkMessages("fr-int-1", 0L, 10, null, null, null);
         assertTrue(stuck.messages().isEmpty(), "BARRIER still blocked");
         assertNotNull(stuck.barrierStatus());
         assertTrue(stuck.barrierStatus().contains("carol"));
 
         // Human force-releases
-        QhorusMcpTools.ForceReleaseResult released = tools.forceReleaseChannel("fr-int-1", "carol unavailable");
+        QhorusMcpTools.ForceReleaseResult released = tools.forceReleaseChannel("fr-int-1", "carol unavailable", null);
 
         assertEquals(2, released.messageCount());
         assertTrue(released.messages().stream().anyMatch(m -> "alice done".equals(m.content())));
         assertTrue(released.messages().stream().anyMatch(m -> "bob done".equals(m.content())));
 
         // Channel is now clear
-        QhorusMcpTools.CheckResult afterRelease = tools.checkMessages("fr-int-1", 0L, 10, null);
+        QhorusMcpTools.CheckResult afterRelease = tools.checkMessages("fr-int-1", 0L, 10, null, null, null);
         assertTrue(afterRelease.messages().isEmpty());
     }
 
@@ -209,41 +208,38 @@ class ForceReleaseTest {
     @TestTransaction
     void e2eHumanForceReleasesStuckBarrier() {
         // Setup: BARRIER channel waiting for two reviewers
-        tools.createChannel("fr-e2e-1", "Code Review", "BARRIER", "reviewer-1,reviewer-2");
+        tools.createChannel("fr-e2e-1", "Code Review", "BARRIER", "reviewer-1,reviewer-2", null, null, null, null, null);
 
         // Reviewer 1 submits (reviewer 2 is unavailable)
-        tools.sendMessage("fr-e2e-1", "reviewer-1", "response",
-                "LGTM — approved by reviewer-1", null, null, null, null);
+        tools.sendMessage("fr-e2e-1", "reviewer-1", "response", "LGTM — approved by reviewer-1", null, null, null, null, null);
 
         // System confirms barrier is stuck
-        QhorusMcpTools.CheckResult stuck = tools.checkMessages("fr-e2e-1", 0L, 10, null);
+        QhorusMcpTools.CheckResult stuck = tools.checkMessages("fr-e2e-1", 0L, 10, null, null, null);
         assertTrue(stuck.messages().isEmpty(), "barrier should be blocked");
 
         // Human observes the situation and decides to unblock
-        QhorusMcpTools.ForceReleaseResult result = tools.forceReleaseChannel("fr-e2e-1",
-                "reviewer-2 unavailable — emergency release");
+        QhorusMcpTools.ForceReleaseResult result = tools.forceReleaseChannel("fr-e2e-1", "reviewer-2 unavailable — emergency release", null);
 
         // Verify: one message delivered, channel cleared
         assertEquals(1, result.messageCount());
         assertEquals("LGTM — approved by reviewer-1", result.messages().get(0).content());
 
         // Channel is clear — downstream work can proceed
-        assertTrue(tools.checkMessages("fr-e2e-1", 0L, 10, null).messages().isEmpty());
+        assertTrue(tools.checkMessages("fr-e2e-1", 0L, 10, null, null, null).messages().isEmpty());
     }
 
     @Test
     @TestTransaction
     void e2eHumanForceReleasesStuckCollect() {
-        tools.createChannel("fr-e2e-2", "Results", "COLLECT", null);
+        tools.createChannel("fr-e2e-2", "Results", "COLLECT", null, null, null, null, null, null);
 
         // Multiple agents have submitted results
-        tools.sendMessage("fr-e2e-2", "agent-1", "response", "result-1", null, null, null, null);
-        tools.sendMessage("fr-e2e-2", "agent-2", "response", "result-2", null, null, null, null);
-        tools.sendMessage("fr-e2e-2", "agent-3", "response", "result-3", null, null, null, null);
+        tools.sendMessage("fr-e2e-2", "agent-1", "response", "result-1", null, null, null, null, null);
+        tools.sendMessage("fr-e2e-2", "agent-2", "response", "result-2", null, null, null, null, null);
+        tools.sendMessage("fr-e2e-2", "agent-3", "response", "result-3", null, null, null, null, null);
 
         // Human decides to collect now (without waiting for more agents)
-        QhorusMcpTools.ForceReleaseResult result = tools.forceReleaseChannel("fr-e2e-2",
-                "collecting early — sufficient results");
+        QhorusMcpTools.ForceReleaseResult result = tools.forceReleaseChannel("fr-e2e-2", "collecting early — sufficient results", null);
 
         assertEquals(3, result.messageCount());
         List<String> contents = result.messages().stream()

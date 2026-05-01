@@ -38,8 +38,7 @@ class ChannelAllowedTypesTest {
     @Test
     @TestTransaction
     void createChannel_existingFourParamOverload_detailShowsNull() {
-        ChannelDetail detail = tools.createChannel(
-                "legacy-" + System.nanoTime(), "Legacy call", null, null);
+        ChannelDetail detail = tools.createChannel("legacy-" + System.nanoTime(), "Legacy call", null, null, null, null, null, null, null);
         assertNull(detail.allowedTypes());
     }
 

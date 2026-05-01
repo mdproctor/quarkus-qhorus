@@ -49,18 +49,18 @@ class EphemeralEdgeCaseTest {
     @Test
     @TestTransaction
     void ephemeralEventMessagesAreNotDeletedOnRead() {
-        tools.createChannel("eph-edge-1", "EPHEMERAL channel", "EPHEMERAL", null);
-        tools.sendMessage("eph-edge-1", "alice", "status", "routing hint", null, null);
-        tools.sendMessage("eph-edge-1", "monitor", "event", "telemetry", null, null);
+        tools.createChannel("eph-edge-1", "EPHEMERAL channel", "EPHEMERAL", null, null, null, null, null, null);
+        tools.sendMessage("eph-edge-1", "alice", "status", "routing hint", null, null, null, null, null);
+        tools.sendMessage("eph-edge-1", "monitor", "event", "telemetry", null, null, null, null, null);
 
         // First read: routing hint is delivered and deleted; EVENT is skipped
-        CheckResult first = tools.checkMessages("eph-edge-1", 0L, 10, null);
+        CheckResult first = tools.checkMessages("eph-edge-1", 0L, 10, null, null, null);
         assertEquals(1, first.messages().size(), "only the non-EVENT message is delivered");
         assertEquals("routing hint", first.messages().get(0).content());
 
         // Second read with cursor=0: routing hint is gone, but the EVENT row remains in the DB.
         // The EVENT row is not visible to agents (pollAfter excludes EVENTs), so this read returns empty.
-        CheckResult second = tools.checkMessages("eph-edge-1", 0L, 10, null);
+        CheckResult second = tools.checkMessages("eph-edge-1", 0L, 10, null, null, null);
         assertTrue(second.messages().isEmpty(),
                 "second read is empty — the routing hint was consumed; EVENT row is invisible but still in DB");
     }
@@ -102,7 +102,7 @@ class EphemeralEdgeCaseTest {
             // Now do a checkMessages — because wait_for_reply did NOT delete the RESPONSE,
             // it is still in the channel. checkMessagesEphemeral will deliver it again AND THEN delete it.
             CheckResult checkResult = QuarkusTransaction.requiringNew().call(
-                    () -> tools.checkMessages(ch, 0L, 10, null));
+                    () -> tools.checkMessages(ch, 0L, 10, null, null, null));
 
             // Channel has QUERY + RESPONSE (2 messages). wait_for_reply does NOT consume them.
             // This documents the double-delivery exposure: the RESPONSE is visible again via checkMessages.
@@ -127,18 +127,18 @@ class EphemeralEdgeCaseTest {
     @Test
     @TestTransaction
     void ephemeralWithOnlyEventMessagesAppearsEmptyButRowsAccumulate() {
-        tools.createChannel("eph-edge-3", "EPHEMERAL channel", "EPHEMERAL", null);
+        tools.createChannel("eph-edge-3", "EPHEMERAL channel", "EPHEMERAL", null, null, null, null, null, null);
 
         // Send 5 EVENT messages
         for (int i = 0; i < 5; i++) {
-            tools.sendMessage("eph-edge-3", "monitor", "event", "telemetry-" + i, null, null);
+            tools.sendMessage("eph-edge-3", "monitor", "event", "telemetry-" + i, null, null, null, null, null);
         }
 
         // Every read returns empty — EVENTs are invisible to agents
-        CheckResult first = tools.checkMessages("eph-edge-3", 0L, 10, null);
+        CheckResult first = tools.checkMessages("eph-edge-3", 0L, 10, null, null, null);
         assertTrue(first.messages().isEmpty());
 
-        CheckResult second = tools.checkMessages("eph-edge-3", 0L, 10, null);
+        CheckResult second = tools.checkMessages("eph-edge-3", 0L, 10, null, null, null);
         assertTrue(second.messages().isEmpty(),
                 "EPHEMERAL channel with only EVENT messages always appears empty to agents");
     }
@@ -155,18 +155,18 @@ class EphemeralEdgeCaseTest {
     @Test
     @TestTransaction
     void ephemeralWithHighCursorSkipsAndDoesNotDeleteEarlierMessages() {
-        tools.createChannel("eph-edge-4", "EPHEMERAL channel", "EPHEMERAL", null);
-        var m1 = tools.sendMessage("eph-edge-4", "alice", "status", "early-msg", null, null);
-        tools.sendMessage("eph-edge-4", "bob", "status", "later-msg", null, null);
+        tools.createChannel("eph-edge-4", "EPHEMERAL channel", "EPHEMERAL", null, null, null, null, null, null);
+        var m1 = tools.sendMessage("eph-edge-4", "alice", "status", "early-msg", null, null, null, null, null);
+        tools.sendMessage("eph-edge-4", "bob", "status", "later-msg", null, null, null, null, null);
 
         // Read with cursor at m1 — only "later-msg" is delivered and deleted
-        CheckResult result = tools.checkMessages("eph-edge-4", m1.messageId(), 10, null);
+        CheckResult result = tools.checkMessages("eph-edge-4", m1.messageId(), 10, null, null, null);
         assertEquals(1, result.messages().size());
         assertEquals("later-msg", result.messages().get(0).content());
 
         // "early-msg" was never delivered (cursor excluded it) so it was NOT deleted.
         // A read with cursor=0 should now deliver it.
-        CheckResult recovery = tools.checkMessages("eph-edge-4", 0L, 10, null);
+        CheckResult recovery = tools.checkMessages("eph-edge-4", 0L, 10, null, null, null);
         assertEquals(1, recovery.messages().size(),
                 "early EPHEMERAL message skipped by high cursor should still be available with cursor=0");
         assertEquals("early-msg", recovery.messages().get(0).content());
@@ -179,14 +179,14 @@ class EphemeralEdgeCaseTest {
     @Test
     @TestTransaction
     void ephemeralChannelIsolationBetweenTwoChannels() {
-        tools.createChannel("eph-isolation-a", "EPHEMERAL A", "EPHEMERAL", null);
-        tools.createChannel("eph-isolation-b", "EPHEMERAL B", "EPHEMERAL", null);
+        tools.createChannel("eph-isolation-a", "EPHEMERAL A", "EPHEMERAL", null, null, null, null, null, null);
+        tools.createChannel("eph-isolation-b", "EPHEMERAL B", "EPHEMERAL", null, null, null, null, null, null);
 
-        tools.sendMessage("eph-isolation-a", "alice", "status", "hint-for-a", null, null);
-        tools.sendMessage("eph-isolation-b", "bob", "status", "hint-for-b", null, null);
+        tools.sendMessage("eph-isolation-a", "alice", "status", "hint-for-a", null, null, null, null, null);
+        tools.sendMessage("eph-isolation-b", "bob", "status", "hint-for-b", null, null, null, null, null);
 
-        CheckResult resultA = tools.checkMessages("eph-isolation-a", 0L, 10, null);
-        CheckResult resultB = tools.checkMessages("eph-isolation-b", 0L, 10, null);
+        CheckResult resultA = tools.checkMessages("eph-isolation-a", 0L, 10, null, null, null);
+        CheckResult resultB = tools.checkMessages("eph-isolation-b", 0L, 10, null, null, null);
 
         assertEquals(1, resultA.messages().size());
         assertEquals("hint-for-a", resultA.messages().get(0).content());

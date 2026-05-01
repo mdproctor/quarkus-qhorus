@@ -26,28 +26,28 @@ class MessageTypeValidationTest {
     @Test
     @TestTransaction
     void declineWithEmptyContentIsRejected() {
-        tools.createChannel("validate-decline-empty", "Test", null, null);
+        tools.createChannel("validate-decline-empty", "Test", null, null, null, null, null, null, null);
 
         assertThrows(ToolCallException.class,
-                () -> tools.sendMessage("validate-decline-empty", "alice", "decline", "", null, null));
+                () -> tools.sendMessage("validate-decline-empty", "alice", "decline", "", null, null, null, null, null));
     }
 
     @Test
     @TestTransaction
     void failureWithBlankContentIsRejected() {
-        tools.createChannel("validate-failure-blank", "Test", null, null);
+        tools.createChannel("validate-failure-blank", "Test", null, null, null, null, null, null, null);
 
         assertThrows(ToolCallException.class,
-                () -> tools.sendMessage("validate-failure-blank", "alice", "failure", "   ", null, null));
+                () -> tools.sendMessage("validate-failure-blank", "alice", "failure", "   ", null, null, null, null, null));
     }
 
     @Test
     @TestTransaction
     void handoffWithoutTargetIsRejected() {
-        tools.createChannel("validate-handoff-notarget", "Test", null, null);
+        tools.createChannel("validate-handoff-notarget", "Test", null, null, null, null, null, null, null);
 
         assertThrows(ToolCallException.class,
-                () -> tools.sendMessage("validate-handoff-notarget", "alice", "handoff", "Please handle this", null, null));
+                () -> tools.sendMessage("validate-handoff-notarget", "alice", "handoff", "Please handle this", null, null, null, null, null));
     }
 
     // -----------------------------------------------------------------------
@@ -57,9 +57,9 @@ class MessageTypeValidationTest {
     @Test
     @TestTransaction
     void queryAutoGeneratesCorrelationId() {
-        tools.createChannel("validate-query-corr", "Test", null, null);
+        tools.createChannel("validate-query-corr", "Test", null, null, null, null, null, null, null);
 
-        MessageResult result = tools.sendMessage("validate-query-corr", "alice", "query", "What is the status?", null, null);
+        MessageResult result = tools.sendMessage("validate-query-corr", "alice", "query", "What is the status?", null, null, null, null, null);
 
         assertNotNull(result.correlationId(), "QUERY with no correlation_id supplied should auto-generate one");
         assertFalse(result.correlationId().isBlank(), "auto-generated correlationId must not be blank");
@@ -68,9 +68,9 @@ class MessageTypeValidationTest {
     @Test
     @TestTransaction
     void commandAutoGeneratesCorrelationId() {
-        tools.createChannel("validate-command-corr", "Test", null, null);
+        tools.createChannel("validate-command-corr", "Test", null, null, null, null, null, null, null);
 
-        MessageResult result = tools.sendMessage("validate-command-corr", "alice", "command", "Execute the task", null, null);
+        MessageResult result = tools.sendMessage("validate-command-corr", "alice", "command", "Execute the task", null, null, null, null, null);
 
         assertNotNull(result.correlationId(), "COMMAND with no correlation_id supplied should auto-generate one");
         assertFalse(result.correlationId().isBlank(), "auto-generated correlationId must not be blank");

@@ -71,13 +71,13 @@ class CollectAtomicityTest {
         try {
             // First committed read: gets all messages and clears the channel
             CheckResult r1 = QuarkusTransaction.requiringNew().call(
-                    () -> tools.checkMessages(ch, 0L, 100, null));
+                    () -> tools.checkMessages(ch, 0L, 100, null, null, null));
             assertEquals(messageCount, r1.messages().size(),
                     "First committed COLLECT read must deliver all " + messageCount + " messages");
 
             // Second committed read: channel was cleared; must return empty
             CheckResult r2 = QuarkusTransaction.requiringNew().call(
-                    () -> tools.checkMessages(ch, 0L, 100, null));
+                    () -> tools.checkMessages(ch, 0L, 100, null, null, null));
             assertTrue(r2.messages().isEmpty(),
                     "Second committed COLLECT read must return empty — channel was cleared by first read");
         } finally {
@@ -113,7 +113,7 @@ class CollectAtomicityTest {
         try {
             // limit=3 — COLLECT must ignore it and deliver all 8
             CheckResult result = QuarkusTransaction.requiringNew().call(
-                    () -> tools.checkMessages(ch, 0L, 3, null));
+                    () -> tools.checkMessages(ch, 0L, 3, null, null, null));
 
             List<Long> deliveredIds = result.messages().stream()
                     .map(QhorusMcpTools.MessageSummary::messageId).toList();
@@ -157,7 +157,7 @@ class CollectAtomicityTest {
             });
 
             CheckResult cycle1 = QuarkusTransaction.requiringNew().call(
-                    () -> tools.checkMessages(ch, 0L, 100, null));
+                    () -> tools.checkMessages(ch, 0L, 100, null, null, null));
             assertEquals(3, cycle1.messages().size(), "cycle 1 must deliver all 3 messages");
             assertTrue(cycle1.messages().stream().allMatch(m -> m.content().startsWith("cycle1")));
 
@@ -169,7 +169,7 @@ class CollectAtomicityTest {
             });
 
             CheckResult cycle2 = QuarkusTransaction.requiringNew().call(
-                    () -> tools.checkMessages(ch, 0L, 100, null));
+                    () -> tools.checkMessages(ch, 0L, 100, null, null, null));
             assertEquals(2, cycle2.messages().size(),
                     "cycle 2 must deliver only the 2 new messages, not cycle 1 messages that were cleared");
             assertTrue(cycle2.messages().stream().allMatch(m -> m.content().startsWith("cycle2")),
@@ -209,7 +209,7 @@ class CollectAtomicityTest {
 
             // Collect cycle 1 — should deliver only the 2 non-EVENT messages
             CheckResult cycle1 = QuarkusTransaction.requiringNew().call(
-                    () -> tools.checkMessages(ch, 0L, 100, null));
+                    () -> tools.checkMessages(ch, 0L, 100, null, null, null));
             assertEquals(2, cycle1.messages().size(),
                     "collect cycle 1 must deliver exactly 2 non-EVENT messages");
             assertTrue(cycle1.messages().stream().noneMatch(m -> "EVENT".equals(m.messageType())),
@@ -222,7 +222,7 @@ class CollectAtomicityTest {
             });
 
             CheckResult cycle2 = QuarkusTransaction.requiringNew().call(
-                    () -> tools.checkMessages(ch, 0L, 100, null));
+                    () -> tools.checkMessages(ch, 0L, 100, null, null, null));
             assertEquals(1, cycle2.messages().size(),
                     "collect cycle 2 must deliver only carol's message; surviving EVENTs must not appear");
             assertEquals("cycle2-result", cycle2.messages().get(0).content());

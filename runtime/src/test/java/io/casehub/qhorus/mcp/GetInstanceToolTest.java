@@ -25,8 +25,7 @@ class GetInstanceToolTest {
     @Test
     void getInstance_knownId_returnsCorrectInfo() {
         String instanceId = "inst-get-" + System.nanoTime();
-        QuarkusTransaction.requiringNew().run(() -> instanceService.register(instanceId, "Test agent",
-                List.of("search", "analysis"), null));
+        QuarkusTransaction.requiringNew().run(() -> instanceService.register(instanceId, "Test agent", List.of("search", "analysis"), null));
 
         InstanceInfo info = QuarkusTransaction.requiringNew().call(() -> tools.getInstance(instanceId));
 
