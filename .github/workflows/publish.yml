@@ -49,4 +49,4 @@ jobs:
               2>/dev/null && echo "  ✅ $repo triggered" || echo "  ⚠️  $repo trigger failed"
           done
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}
