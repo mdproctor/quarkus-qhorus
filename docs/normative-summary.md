@@ -55,15 +55,22 @@ describes what the CommitmentStore looks like when the pattern is violated.
 ### work-and-workitems.md — The Human Layer
 
 The key argument: machine-agent and human-agent obligations differ in one
-fundamental dimension — **temporal scope**. Machine work resolves in seconds;
-the commitment opens and closes with the infrastructure tracking the gap. Human
-work spans minutes, hours, or days. Every state WorkItem introduces beyond the
-machine-layer minimum — ACKNOWLEDGED, IN_PROGRESS, SUSPENDED, DELEGATED — is a
-normative artifact of that temporal gap.
+fundamental dimension — **obligation continuity**. A machine agent can wait
+hours for a long-running process, block on a signal, or hold an obligation open
+across many STATUS updates — duration is not the distinction. What a machine
+agent does not do is hold an obligation *discontinuously*: set it aside, attend
+to other things, and return. It is either present and working, or it has formally
+released via DONE, FAILURE, DECLINE, or HANDOFF.
+
+A human agent holds obligations discontinuously by nature — stepping away,
+switching context, partially delegating while retaining accountability, returning
+after interruption. Every state WorkItem introduces beyond the machine-layer
+minimum — ACKNOWLEDGED, IN_PROGRESS, SUSPENDED, DELEGATED — is a normative
+artifact of that discontinuous holding, not of duration.
 
 The document establishes this cleanly: casehub-work is not filling gaps in the
 machine-layer taxonomy. It is the human-agent layer — a principled extension of
-the Qhorus normative model for obligations held and resolved on human timescales.
+the Qhorus normative model for obligations held discontinuously.
 
 The seam between layers is the oversight channel. Layer 1 has a synthetic human
 posting COMMAND directly. Layer 2 replaces that synthetic post with a real
@@ -92,7 +99,9 @@ detectably wrong.
 
 **The extension model is clean.** SUSPENDED and sub-delegation (DELEGATED with
 retained owner) are correctly identified as human-layer concepts with no
-machine-layer equivalent and no semantic overlap with any existing type. The
+machine-layer equivalent and no semantic overlap with any existing type. SUSPENDED
+exists because humans can pause an obligation without failing or transferring it —
+a machine agent in the same situation either continues or formally releases. The
 formal extension contract — prove non-overlap before use, namespace new types,
 define a promotion path to core — is the right governance mechanism.
 

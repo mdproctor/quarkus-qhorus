@@ -25,9 +25,11 @@ The normative layer uses "work" to mean any goal-directed activity commissioned 
 
 A **WorkItem** is something different. It is not the obligation. It is the mechanism by which an obligation is fulfilled when the agent is human.
 
-Machine work resolves in the same session or within seconds. The commitment opens and closes on the work channel with the infrastructure tracking the gap. Human work spans minutes, hours, or days. The human is not continuously executing — they receive a task, may set it aside, may reassign it, may be interrupted. That extended temporal gap introduces lifecycle states that the machine-agent model correctly omits but that matter normatively for human agents: not just whether the obligation was fulfilled, but how it was held, transferred, and eventually resolved over time.
+The distinction is not duration. A machine agent can wait hours for a long-running process, poll for an external signal, or block on a BARRIER channel — it may hold an obligation open for a long time. What it does not do is hold an obligation *discontinuously*. A machine agent is either present and actively working its obligation, or it has formally released it via DONE, FAILURE, DECLINE, or HANDOFF. It does not set the obligation aside, switch to other work, and return later. It does not pause without either completing or transferring.
 
-**Work** is the obligation. **WorkItem** is the human-layer implementation of an obligation with extended temporal scope.
+A human agent does exactly this. They receive a task, may set it aside while attending to something else, may partially delegate while retaining accountability, may be interrupted and return. The obligation is held discontinuously — across gaps in attention, across handoffs where the original holder remains accountable, across pauses that are neither failures nor transfers. That discontinuous holding is what the machine-agent model correctly omits and what the human-layer model must accommodate.
+
+**Work** is the obligation. **WorkItem** is the human-layer implementation of an obligation held discontinuously.
 
 ---
 
@@ -45,7 +47,7 @@ The Qhorus 9-type speech act taxonomy is not specific to machines. It describes 
 | IN_PROGRESS → COMPLETED | DONE | Assertive fulfillment: I have discharged what was asked of me |
 | → EXPIRED → ESCALATED | EXPIRED | Obligation passed its deadline with no terminal resolution |
 
-The WorkItem lifecycle is not a status machine layered on top of Qhorus. It *is* the Qhorus commitment lifecycle, extended for human-paced obligations. The `OPEN → ACKNOWLEDGED → FULFILLED` path in the CommitmentStore maps onto `PENDING → ASSIGNED → COMPLETED`. The machine-paced version collapses the middle because it happens in seconds. The human-paced version exposes it because it takes hours.
+The WorkItem lifecycle is not a status machine layered on top of Qhorus. It *is* the Qhorus commitment lifecycle, extended for obligations held discontinuously. The `OPEN → ACKNOWLEDGED → FULFILLED` path in the CommitmentStore maps onto `PENDING → ASSIGNED → COMPLETED`. The machine layer collapses the middle because a machine agent is either present and working or has formally released — there is no discontinuity to track. The human layer exposes it because discontinuous holding is the norm, not the exception.
 
 ---
 
