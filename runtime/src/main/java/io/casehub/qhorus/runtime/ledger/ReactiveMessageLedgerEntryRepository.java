@@ -146,4 +146,24 @@ public class ReactiveMessageLedgerEntryRepository implements ReactiveLedgerEntry
         throw new UnsupportedOperationException(
                 "Reactive attestation reads not yet supported — use blocking LedgerEntryRepository");
     }
+
+    @Override
+    public Uni<List<LedgerAttestation>> findAttestationsByEntryIdAndCapabilityTag(final UUID ledgerEntryId,
+            final String capabilityTag) {
+        throw new UnsupportedOperationException(
+                "Reactive attestation reads not yet supported — use blocking LedgerEntryRepository");
+    }
+
+    @Override
+    public Uni<List<LedgerAttestation>> findAttestationsByEntryIdGlobal(final UUID ledgerEntryId) {
+        throw new UnsupportedOperationException(
+                "Reactive attestation reads not yet supported — use blocking LedgerEntryRepository");
+    }
+
+    @Override
+    public Uni<List<LedgerAttestation>> findAttestationsByAttestorIdAndCapabilityTag(final String attestorId,
+            final String capabilityTag) {
+        throw new UnsupportedOperationException(
+                "Reactive attestation reads not yet supported — use blocking LedgerEntryRepository");
+    }
 }

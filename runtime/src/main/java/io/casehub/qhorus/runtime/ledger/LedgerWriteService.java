@@ -14,6 +14,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.casehub.ledger.api.model.ActorTypeResolver;
+import io.casehub.ledger.api.model.CapabilityTag;
 import io.casehub.ledger.api.model.LedgerEntryType;
 import io.casehub.ledger.runtime.config.LedgerConfig;
 import io.casehub.ledger.runtime.model.LedgerAttestation;
@@ -168,14 +169,32 @@ public class LedgerWriteService {
                 attestation.attestorType = outcome.attestorType();
                 attestation.verdict = outcome.verdict();
                 attestation.confidence = outcome.confidence();
+                attestation.capabilityTag = extractCapabilityTag(commandEntry.content);
                 repository.saveAttestation(attestation);
-                LOG.debugf("LedgerAttestation %s written for COMMAND entry %s (correlationId='%s')",
-                        attestation.verdict, commandEntry.id, commandEntry.correlationId);
+                LOG.debugf("LedgerAttestation %s written for COMMAND entry %s (correlationId='%s', capability='%s')",
+                        attestation.verdict, commandEntry.id, commandEntry.correlationId,
+                        attestation.capabilityTag);
             } catch (final Exception e) {
                 LOG.warnf("Could not write attestation for entry %s — trust signal lost but pipeline unaffected",
                         commandEntry.id);
             }
         });
+    }
+
+    private String extractCapabilityTag(final String content) {
+        if (content == null || !content.stripLeading().startsWith("{")) {
+            return CapabilityTag.GLOBAL;
+        }
+        try {
+            final JsonNode root = objectMapper.readTree(content);
+            final JsonNode cap = root.get("capability");
+            if (cap != null && cap.isTextual() && !cap.asText().isBlank()) {
+                return cap.asText();
+            }
+        } catch (final Exception ignored) {
+            // malformed JSON — fall through to global
+        }
+        return CapabilityTag.GLOBAL;
     }
 
     private void populateTelemetry(final MessageLedgerEntry entry, final String content) {

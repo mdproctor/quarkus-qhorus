@@ -10,6 +10,7 @@ import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
 
 import io.casehub.ledger.api.model.AttestationVerdict;
+import io.casehub.ledger.api.model.CapabilityTag;
 import io.casehub.ledger.runtime.model.LedgerAttestation;
 import io.casehub.qhorus.runtime.channel.Channel;
 import io.casehub.qhorus.runtime.ledger.MessageLedgerEntry;
@@ -135,6 +136,41 @@ class LedgerAttestationIntegrationTest {
         MessageLedgerEntry doneEntry = ledgerRepo.findAllByCorrelationId(channelId, corrId).stream()
                 .filter(e -> "DONE".equals(e.messageType)).findFirst().orElseThrow();
         assertTrue(ledgerRepo.findAttestationsByEntryId(doneEntry.id).isEmpty());
+    }
+
+    @Test
+    void done_with_capability_in_command_sets_capabilityTag_on_attestation() {
+        String channelName = "attest-cap-" + System.nanoTime();
+        String corrId = UUID.randomUUID().toString();
+        setup(channelName, "agent-a", "agent-b");
+
+        tools.sendMessage(channelName, "agent-a", "command",
+                "{\"capability\":\"code-review\",\"task\":\"Review PR\"}", corrId, null, null, null, null);
+        tools.sendMessage(channelName, "agent-b", "done", "Review done", corrId, null, null, null, null);
+
+        UUID channelId = channelId(channelName);
+        MessageLedgerEntry commandEntry = ledgerRepo.findAllByCorrelationId(channelId, corrId).stream()
+                .filter(e -> "COMMAND".equals(e.messageType)).findFirst().orElseThrow();
+        List<LedgerAttestation> attestations = ledgerRepo.findAttestationsByEntryId(commandEntry.id);
+        assertEquals(1, attestations.size());
+        assertEquals("code-review", attestations.get(0).capabilityTag);
+    }
+
+    @Test
+    void done_with_no_capability_in_command_defaults_to_global() {
+        String channelName = "attest-nocap-" + System.nanoTime();
+        String corrId = UUID.randomUUID().toString();
+        setup(channelName, "agent-a", "agent-b");
+
+        tools.sendMessage(channelName, "agent-a", "command", "Plain text command", corrId, null, null, null, null);
+        tools.sendMessage(channelName, "agent-b", "done", "Done", corrId, null, null, null, null);
+
+        UUID channelId = channelId(channelName);
+        MessageLedgerEntry commandEntry = ledgerRepo.findAllByCorrelationId(channelId, corrId).stream()
+                .filter(e -> "COMMAND".equals(e.messageType)).findFirst().orElseThrow();
+        List<LedgerAttestation> attestations = ledgerRepo.findAttestationsByEntryId(commandEntry.id);
+        assertEquals(1, attestations.size());
+        assertEquals(CapabilityTag.GLOBAL, attestations.get(0).capabilityTag);
     }
 
     @Test

@@ -356,6 +356,31 @@ public class MessageLedgerEntryRepository implements LedgerEntryRepository {
     }
 
     @Override
+    public List<LedgerAttestation> findAttestationsByEntryIdAndCapabilityTag(final UUID ledgerEntryId,
+            final String capabilityTag) {
+        return em.createNamedQuery("LedgerAttestation.findByEntryIdAndCapabilityTag", LedgerAttestation.class)
+                .setParameter("entryId", ledgerEntryId)
+                .setParameter("capabilityTag", capabilityTag)
+                .getResultList();
+    }
+
+    @Override
+    public List<LedgerAttestation> findAttestationsByEntryIdGlobal(final UUID ledgerEntryId) {
+        return em.createNamedQuery("LedgerAttestation.findGlobalByEntryId", LedgerAttestation.class)
+                .setParameter("entryId", ledgerEntryId)
+                .getResultList();
+    }
+
+    @Override
+    public List<LedgerAttestation> findAttestationsByAttestorIdAndCapabilityTag(final String attestorId,
+            final String capabilityTag) {
+        return em.createNamedQuery("LedgerAttestation.findByAttestorIdAndCapabilityTag", LedgerAttestation.class)
+                .setParameter("attestorId", attestorId)
+                .setParameter("capabilityTag", capabilityTag)
+                .getResultList();
+    }
+
+    @Override
     public List<LedgerEntry> findByActorId(final String actorId, final Instant from, final Instant to) {
         return em.createQuery(
                 "SELECT e FROM LedgerEntry e WHERE e.actorId = :aid " +
