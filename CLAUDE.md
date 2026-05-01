@@ -167,7 +167,10 @@ JAVA_HOME=/Library/Java/JavaVirtualMachines/graalvm-25.jdk/Contents/Home \
 
 **Use `mvn` not `./mvnw`** — maven wrapper not configured on this machine.
 
+**After API visibility changes, always run `mvn install` from the project root** — `mvn test` scoped to a child module (e.g. `runtime/`) does not compile sibling `examples/` modules that depend on it. Compile errors in those modules are invisible until the full build runs.
+
 **Testing conventions** — platform-wide Quarkus patterns in `docs/conventions/` at parent (`@TestTransaction` scope, CDI alternative stores, scheduler isolation, `ManagedExecutor`):
+- Non-`@Tool` public methods sharing a name with a `@Tool`-annotated method in `QhorusMcpTools` or `ReactiveQhorusMcpTools` cause the `@Tool` to be silently dropped from the MCP registry with no error or warning. `ToolOverloadDiscoverabilityTest` (pure reflection, no Quarkus) guards against regressions — it fails immediately if any public non-`@Tool` overload shares a name with a `@Tool` method. Never add `public` to convenience overloads of `@Tool` methods; use package-private visibility. Refs #129.
 - `LedgerWriteService.record()` uses `REQUIRES_NEW` — ledger entries from prior tests' `@BeforeEach` runs PERSIST after rollback. Always set up channels and send scenario messages inside the `@Test` method body to avoid stale ledger entries interfering with queries in subsequent tests.
 - Optional modules (`a2a`, `watchdog`) require a `@TestProfile` that sets `casehub.qhorus.<module>.enabled=true`. Any `@TestProfile` that causes Quarkus to restart must also include the full `quarkus.datasource.qhorus.*` block (db-kind, jdbc.url, username, password) plus `quarkus.datasource.qhorus.reactive=false` and `quarkus.hibernate-orm.qhorus.database.generation=drop-and-create` in `getConfigOverrides()` — Quarkus restarts do not inherit test `application.properties` from prior context.
 - `RateLimiter` is an `@ApplicationScoped` in-memory bean — its state does NOT roll back with `@TestTransaction`. Use unique channel names per test to avoid cross-test interference.
